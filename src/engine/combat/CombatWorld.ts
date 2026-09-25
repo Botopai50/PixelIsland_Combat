@@ -81,9 +81,40 @@ export class CombatWorld {
       if (d > maxDist || d < 0.01) continue;
       const c = p.divideScalar(d).dot(forward);
       if (c < cos) continue;
-      const score = d * (2 - c);
+      // prioriza o que está no centro da visão, depois a distância
+      const score = d * (1 + 3 * (1 - c));
       if (score < bestScore) {
         bestScore = score;
+        best = t;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Troca de alvo: o próximo alvo à esquerda (side = -1) ou à direita (+1) do
+   * atual, visto de `from`. Retorna null se não houver ninguém daquele lado.
+   */
+  findSideTarget(from: THREE.Vector3, current: Damageable, side: 1 | -1, maxDist: number, team: Team): Damageable | null {
+    const c = current.center(new THREE.Vector3()).sub(from);
+    const baseYaw = Math.atan2(c.x, c.z);
+    let best: Damageable | null = null;
+    let bestA = Infinity;
+    const p = new THREE.Vector3();
+    for (const t of this.targets) {
+      if (t === current || !t.alive || !t.lockable || t.team === team) continue;
+      t.center(p).sub(from);
+      p.y = 0;
+      if (p.length() > maxDist) continue;
+      let a = Math.atan2(p.x, p.z) - baseYaw;
+      a = Math.atan2(Math.sin(a), Math.cos(a));
+      // yaw cresce para a esquerda (x+ é a esquerda do personagem que olha +Z)
+      const onSide = side === -1 ? a > 0.02 : a < -0.02;
+      if (!onSide) continue;
+      // o mais próximo em ângulo; empate → o mais perto
+      const aa = Math.abs(a) + p.length() * 0.02;
+      if (aa < bestA) {
+        bestA = aa;
         best = t;
       }
     }

@@ -29,6 +29,8 @@ export class CameraRig implements AimSource {
   private pivot = new THREE.Vector3();
   private tmp = new THREE.Vector3();
   private swingLean = new THREE.Vector3();
+  private lockFlick = 0;
+  private lockFlickCd = 0;
   private leanSm = new THREE.Vector3();
   private tmp2 = new THREE.Vector3();
   private dir = new THREE.Vector3();
@@ -83,8 +85,22 @@ export class CameraRig implements AimSource {
     // ------------------------------------------------ olhar
     const sens = 0.0022 * T.sensitivity;
     const aimSlow = p.state === 'bow' ? 0.6 : 1;
-    this.yaw -= inp.lookX * sens * aimSlow;
-    this.pitch -= inp.lookY * sens * aimSlow * (T.invertY ? -1 : 1);
+    const locked = !!p.lockTarget && p.state !== 'bow';
+    if (locked) {
+      // travado: a câmera é do alvo. Um movimento rápido para o lado troca de alvo
+      // (antes o mouse brigava com a trava e a câmera ficava puxando/tremendo)
+      this.lockFlick = this.lockFlick * Math.exp(-realDt * 6) + inp.lookX * sens;
+      this.lockFlickCd -= realDt;
+      if (Math.abs(this.lockFlick) > 0.12 && this.lockFlickCd <= 0) {
+        p.switchLock(this.lockFlick > 0 ? 1 : -1);
+        this.lockFlick = 0;
+        this.lockFlickCd = 0.35;
+      }
+    } else {
+      this.lockFlick = 0;
+      this.yaw -= inp.lookX * sens * aimSlow;
+      this.pitch -= inp.lookY * sens * aimSlow * (T.invertY ? -1 : 1);
+    }
     const maxPitch = this.blend > 0.5 ? 1.45 : 1.05;
     this.pitch = clamp(this.pitch, -1.3, maxPitch);
 
@@ -92,17 +108,20 @@ export class CameraRig implements AimSource {
     if (inp.consume('shoulder')) this.toggleShoulder();
 
     // lock-on: gira a câmera para enquadrar o alvo
-    if (p.lockTarget && T.lockOnAssist) {
+    if (locked && p.lockTarget) {
       p.lockTarget.center(this.tmp).sub(p.position);
-      const targetYaw = dirToYaw(this.tmp.x, this.tmp.z);
-      this.yaw = dampAngle(this.yaw, targetYaw, this.blend > 0.5 ? 10 : 5, realDt);
       const dist = Math.hypot(this.tmp.x, this.tmp.z);
+      // colado no alvo o ângulo gira sem controle: segura o yaw atual
+      if (dist > 0.8) {
+        const targetYaw = dirToYaw(this.tmp.x, this.tmp.z);
+        this.yaw = dampAngle(this.yaw, targetYaw, this.blend > 0.5 ? 12 : 6, realDt);
+      }
       // 1ª pessoa: mira no peito do alvo a partir da altura do OLHO (a mira central cai no alvo).
       // 3ª pessoa: enquadra de cima, com o alvo um pouco abaixo do centro.
       // mira exatamente no ponto da retícula, medido da posição real da câmera (olho)
       p.lockTarget.center(this.tmp2).sub(this.camera.position);
-      const firstP = Math.atan2(this.tmp2.y, Math.max(0.3, Math.hypot(this.tmp2.x, this.tmp2.z)));
-      const thirdP = Math.atan2(this.tmp.y - 0.6, dist) - 0.18;
+      const firstP = Math.atan2(this.tmp2.y, Math.max(1.0, Math.hypot(this.tmp2.x, this.tmp2.z)));
+      const thirdP = Math.atan2(this.tmp.y - 0.6, Math.max(dist, 3.5)) - 0.18;
       const wantPitch = this.blend > 0.5 ? firstP : thirdP;
       this.pitch = damp(this.pitch, wantPitch, this.blend > 0.5 ? 10 : 4, realDt);
     }

@@ -382,6 +382,14 @@ export class PlayerController implements Damageable {
     }
   }
 
+  /** Troca o alvo travado para o próximo à esquerda (-1) ou direita (+1). */
+  switchLock(side: 1 | -1): boolean {
+    if (!this.lockTarget) return false;
+    const t = this.ctx.combat.findSideTarget(this.position, this.lockTarget, side, 20, 'player');
+    if (t) this.lockTarget = t;
+    return !!t;
+  }
+
   private pickFacingForAttack() {
     const T = this.ctx.tuning;
     if (this.aim.firstPerson) {
@@ -651,7 +659,11 @@ export class PlayerController implements Damageable {
     }
     if (this.lockTarget) {
       this.lockTarget.center(this.tmp);
-      if (!this.lockTarget.alive || this.tmp.distanceTo(this.position) > 26) this.lockTarget = null;
+      if (!this.lockTarget.alive) {
+        // alvo caiu: passa para o próximo inimigo à vista (como no Zelda)
+        const fwd = yawToDir(this.aim.yaw, this.tmp2);
+        this.lockTarget = ctx.combat.findLockTarget(this.position, fwd, 18, 90, 'player');
+      } else if (this.tmp.distanceTo(this.position) > 26) this.lockTarget = null;
     }
 
     // ---------------------------------------------- stamina
@@ -1047,7 +1059,8 @@ export class PlayerController implements Damageable {
       this.facing = dampAngle(this.facing, this.aim.yaw, T2 * 1.3, dt);
     } else if (faceMode === 'lock' && this.lockTarget) {
       this.lockTarget.center(this.tmp).sub(this.position);
-      this.facing = dampAngle(this.facing, dirToYaw(this.tmp.x, this.tmp.z), T2, dt);
+      // colado no alvo a direção fica instável: mantém a atual
+      if (Math.hypot(this.tmp.x, this.tmp.z) > 0.6) this.facing = dampAngle(this.facing, dirToYaw(this.tmp.x, this.tmp.z), T2, dt);
     }
     this.facing = wrapAngle(this.facing);
     this.turnRate = angleDelta(this.lastFacing, this.facing) / dt;
