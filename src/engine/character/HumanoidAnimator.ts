@@ -179,11 +179,13 @@ export class HumanoidAnimator {
     // coxa vai mais à frente que atrás; o calcanhar sobe logo após empurrar o chão
     // (pico adiantado no ciclo); joelho de apoio flexiona de leve para absorver.
     // passada enorme: joelho da frente alto, perna de trás esticada para trás
-    const rThighR = -sn * 1.12 - 0.3, rThighL = sn * 1.12 - 0.3;
-    const kickR = Math.pow(pos(Math.cos(ph + 0.6)), 1.2), kickL = Math.pow(pos(-Math.cos(ph + 0.6)), 1.2);
+    const rThighR = -sn * 1.05 - 0.4, rThighL = sn * 1.05 - 0.4;
+    // o calcanhar sobe LOGO após empurrar o chão (perna de trás já dobrada no voo)
+    const kickR = Math.pow(pos(Math.cos(ph + 1.05)), 0.85), kickL = Math.pow(pos(-Math.cos(ph + 1.05)), 0.85);
     // calcanhar de trás bem alto (canela quase horizontal atrás)
-    const rShinR = 0.25 + kickR * 1.95 + pos(-cs) * 0.25;
-    const rShinL = 0.25 + kickL * 1.95 + pos(cs) * 0.25;
+    // perna da frente: joelho alto com o pé embaixo do joelho (não estica à frente)
+    const rShinR = 0.2 + kickR * 2.0 + pos(sn) * 0.75;
+    const rShinL = 0.2 + kickL * 2.0 + pos(-sn) * 0.75;
     const rFootR = -(rThighR + rShinR) * 0.7 + pos(-sn) * 0.3;
     const rFootL = -(rThighL + rShinL) * 0.7 + pos(sn) * 0.3;
 
@@ -224,7 +226,7 @@ export class HumanoidAnimator {
 
     // --- sobe e desce: andar é mais alto com a perna vertical e desce no apoio duplo;
     //     correr sobe na fase de voo
-    let bob = (Math.abs(cs) - 1) * 0.028 * W + Math.abs(cs) * 0.1 * R - 0.07 * R;
+    let bob = (Math.abs(cs) - 1) * 0.028 * W + Math.abs(cs) * 0.14 * R - 0.09 * R;
 
     // ---------------------------------------------------------------- parado (idle)
     const idle = 1 - moving;
