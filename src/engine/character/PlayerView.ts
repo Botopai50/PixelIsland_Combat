@@ -243,23 +243,19 @@ export class PlayerView {
         if ((main === 'axe' || main === 'pickaxe' || swordGuard) && g > 0.01) {
           // defesa com ferramenta/espada sem escudo: arma na horizontal à frente
           // do peito, duas mãos (espada: mão esquerda apoiada na lâmina, gume para cima)
-          const hand = this.v2.set(swordGuard ? -0.2 : -0.22, (swordGuard ? 1.28 : 1.3) - this.shieldSpring.value * 0.03, swordGuard ? 0.44 : 0.38).applyQuaternion(this.yawQ).add(p.position);
+          const hand = this.v2.set(swordGuard ? -0.26 : -0.22, (swordGuard ? 1.36 : 1.3) - this.shieldSpring.value * 0.03, swordGuard ? 0.34 : 0.38).applyQuaternion(this.yawQ).add(p.position);
           hand.y += p.motor.visualStepOffset;
-          const dir = this.dir.set(1, swordGuard ? 0.14 : 0.3, swordGuard ? 0.1 : 0.1).normalize().applyQuaternion(this.yawQ);
+          const dir = this.dir.set(1, swordGuard ? 0.22 : 0.3, swordGuard ? 0.18 : 0.1).normalize().applyQuaternion(this.yawQ);
           const edge = this.edge.set(0, 1, 0);
           weaponBasis(dir, edge, this.q2);
           model.root.position.lerp(hand, g);
           model.root.quaternion.slerp(this.q2, g);
-          // cotovelos: espada → para baixo e junto ao corpo (natural); ferramenta → abertos
-          const out = swordGuard ? 0.2 : 0.5, down = swordGuard ? -0.9 : -0.6, back = swordGuard ? -0.25 : 0;
-          const fx = Math.sin(yaw), fz = Math.cos(yaw);
           rig.joints.upperArmR.getWorldPosition(this.pole);
-          this.pole.add(this.v.set(-Math.cos(yaw) * out + fx * back, down, Math.sin(yaw) * out + fz * back));
+          this.pole.add(this.v.set(-Math.cos(yaw) * 0.5, -0.6, Math.sin(yaw) * 0.5));
           solveTwoBoneIK(rig.joints.upperArmR, rig.joints.forearmR, ARM_UPPER, ARM_FORE, model.root.position, this.pole, g);
-          const grip = this.v.copy(dir).multiplyScalar(swordGuard ? 0.42 : 0.45).add(model.root.position);
-          if (swordGuard) grip.y -= 0.03; // palma apoiada por baixo da lâmina
+          const grip = this.v.copy(dir).multiplyScalar(swordGuard ? 0.55 : 0.45).add(model.root.position);
           rig.joints.upperArmL.getWorldPosition(this.pole);
-          this.pole.add(this.hand.set(Math.cos(yaw) * out + fx * back, down, -Math.sin(yaw) * out + fz * back));
+          this.pole.add(this.hand.set(Math.cos(yaw) * 0.5, -0.6, -Math.sin(yaw) * 0.5));
           solveTwoBoneIK(rig.joints.upperArmL, rig.joints.forearmL, ARM_UPPER, ARM_FORE, grip, this.pole, g);
         }
       }
