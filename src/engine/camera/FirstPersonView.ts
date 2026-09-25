@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GameContext } from '../core/Context';
 import type { PlayerController } from '../character/PlayerController';
-import { createWeaponModel, type WeaponModel } from '../items/WeaponModels';
+import { createWeaponModel, BOW_DRAW_LEN, type WeaponModel } from '../items/WeaponModels';
 import { ATTACKS, TWO_HAND_GRIP, pivotFor, swingDirLocal } from '../combat/Attacks';
 import { SlashTrail } from '../vfx/Trail';
 import { Spring, Spring3, clamp01, damp, easeOutBack, lerp } from '../core/math';
@@ -247,7 +247,7 @@ export class FirstPersonView {
       model.root.quaternion.setFromEuler(new THREE.Euler(0, Math.PI, lerp(0.5, 0.2, aimW)));
       this.placeArm(this.armL, grip, -1);
       // mão direita na corda
-      const stringPos = this.v2.set(0, 0, -0.1 - draw * 0.55).applyQuaternion(model.root.quaternion).add(grip);
+      const stringPos = this.v2.set(0, 0, -0.1 - draw * BOW_DRAW_LEN).applyQuaternion(model.root.quaternion).add(grip);
       if (drawing) this.placeArm(this.armR, stringPos.clone(), 1);
     }
 

@@ -559,8 +559,11 @@ export class PlayerController implements Damageable {
     const cp = Math.cos(this.aim.pitch);
     this.tmp2.set(Math.sin(this.aim.yaw) * cp, Math.sin(this.aim.pitch), Math.cos(this.aim.yaw) * cp);
     out.copy(this.position);
-    out.y += 1.4;
-    out.addScaledVector(this.tmp2, 0.72);
+    out.y += 1.47;
+    out.addScaledVector(this.tmp2, 0.7);
+    // linha do tiro ao lado do rosto (mesmo deslocamento do visual)
+    out.x += -Math.cos(this.aim.yaw) * 0.2;
+    out.z += Math.sin(this.aim.yaw) * 0.2;
     return out;
   }
 

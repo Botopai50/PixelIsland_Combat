@@ -155,6 +155,9 @@ export function createShield(): WeaponModel {
 }
 
 /** Arco: empunhadura na origem, arco no plano YZ, flecha dispara em +Z. */
+/** Quanto a corda recua na puxada completa (m). Usado pelo modelo e pelas mãos (IK). */
+export const BOW_DRAW_LEN = 0.45;
+
 export function createBow(): WeaponModel {
   const g = new THREE.Group();
   const wood = new THREE.MeshStandardMaterial({ color: 0x7a4a24, roughness: 0.7, flatShading: true });
@@ -180,7 +183,7 @@ export function createBow(): WeaponModel {
     s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
   };
   const setDraw = (v: number, nocked: boolean) => {
-    mid.set(0, 0, -0.1 - v * 0.55);
+    mid.set(0, 0, -0.1 - v * BOW_DRAW_LEN);
     placeString(s1, topTip, mid);
     placeString(s2, mid, botTip);
     // limbs flexionam um pouco
