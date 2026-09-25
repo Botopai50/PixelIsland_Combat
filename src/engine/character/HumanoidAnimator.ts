@@ -385,16 +385,21 @@ export class HumanoidAnimator {
     // um instante antes de levantar)
     if (this.landHold > 0) this.landHold -= dt;
     else this.landImpact = damp(this.landImpact, 0, lerp(9, 3.2, this.landLevel), dt);
-    const li = this.landImpact;
-    const hv = clamp01((this.landLevel - 0.5) / 0.4) * li; // pesada
+    // atacando (ex.: pancada do golpe aéreo): o golpe manda — só os joelhos
+    // absorvem; tronco/braços/mão no chão da aterrissagem pesada ficam de fora
+    // (senão a arma, que segue a pose do golpe, atravessa o corpo)
+    const atk = s.action === 'attack' || s.action === 'charge';
+    const li = this.landImpact * (atk ? 0.45 : 1);
+    const hv = atk ? 0 : clamp01((this.landLevel - 0.5) / 0.4) * li; // pesada
     P.thighR.x -= li * 0.95; P.thighL.x -= li * 1.05;
     P.shinR.x += li * 1.6; P.shinL.x += li * 1.7;
     P.footR.x -= li * 0.5; P.footL.x -= li * 0.55;
-    P.spine.x += li * 0.5 + hv * 0.35;
+    const armK = atk ? 0 : 1;
+    P.spine.x += li * 0.5 * armK + hv * 0.35;
     P.head.x -= hv * 0.35;
-    P.upperArmR.z -= li * 0.4; P.upperArmL.z += li * 0.5;
-    P.upperArmR.x -= li * 0.45 * (1 - hv); P.upperArmL.x -= li * 0.35;
-    P.forearmR.x -= li * 0.5 * (1 - hv); P.forearmL.x -= li * 0.6;
+    P.upperArmR.z -= li * 0.4 * armK; P.upperArmL.z += li * 0.5 * armK;
+    P.upperArmR.x -= li * 0.45 * (1 - hv) * armK; P.upperArmL.x -= li * 0.35 * armK;
+    P.forearmR.x -= li * 0.5 * (1 - hv) * armK; P.forearmL.x -= li * 0.6 * armK;
     // pesada: joelho de trás quase no chão, mão direita apoiada à frente
     P.thighR.x += hv * 0.55; P.shinR.x += hv * 0.35;
     P.upperArmR.x += hv * (-0.45 - P.upperArmR.x * 0.6); P.upperArmR.z -= hv * 0.15;
