@@ -384,14 +384,24 @@ export class HumanoidAnimator {
         break;
       }
       case 'bow': {
-        P.chest.y += -0.95;
-        P.spine.y += -0.3;
-        P.neck.y = 0.7;
-        P.head.y = 0.45;
-        P.head.x = -s.aimPitch * 0.5;
-        P.chest.x = -s.aimPitch * 0.5;
-        P.thighR.x = lerp(P.thighR.x, 0.25, 0.5);
-        P.thighL.x = lerp(P.thighL.x, -0.3, 0.5);
+        // postura de arqueiro: corpo de lado (ombro esquerdo para o alvo), pés afastados,
+        // cabeça virada para o alvo; os braços são posicionados por IK no PlayerView
+        targetBodyYaw = -1.15;
+        P.pelvis.y += 0.1;
+        P.chest.y += -0.12;
+        P.neck.y = 0.5;
+        P.head.y = 0.55;
+        P.head.x = -s.aimPitch * 0.35;
+        P.head.z = 0.08;
+        // mirar para cima/baixo inclina o tronco para o lado (o ombro esquerdo sobe/desce)
+        P.spine.z = s.aimPitch * 0.45;
+        P.chest.z = s.aimPitch * 0.2;
+        P.spine.x = 0.04;
+        // base: pés afastados, joelhos levemente dobrados
+        P.thighR.x = 0.05; P.thighL.x = -0.05;
+        P.thighR.z = -0.2; P.thighL.z = 0.2;
+        P.shinR.x = 0.18; P.shinL.x = 0.18;
+        P.footR.z = 0.15; P.footL.z = -0.15;
         break;
       }
       case 'equip': {

@@ -214,21 +214,25 @@ export class PlayerView {
       model.setDraw?.(p.state === 'bow' ? p.bowDraw : 0, nocked);
       if (drawing) {
         const aimDir = this.v.set(Math.sin(p.aim.yaw) * Math.cos(p.aim.pitch), Math.sin(p.aim.pitch), Math.cos(p.aim.yaw) * Math.cos(p.aim.pitch));
-        const grip = p.bowOrigin(this.hand);
-        grip.y += p.motor.visualStepOffset;
+        // braço esquerdo esticado a partir do OMBRO real (corpo já girado de lado pelo animador)
+        const grip = rig.joints.upperArmL.getWorldPosition(this.hand).addScaledVector(aimDir, 0.54);
+        grip.y -= 0.02;
         const up = this.v2.set(0, 1, 0).addScaledVector(aimDir, -aimDir.y).normalize();
-        // leve inclinação do arco
-        up.applyAxisAngle(aimDir, -0.25);
+        // leve inclinação do arco (cantado para fora)
+        up.applyAxisAngle(aimDir, -0.18);
         const x = new THREE.Vector3().crossVectors(up, aimDir);
         this.q.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, up, aimDir));
         model.root.position.copy(grip);
         model.root.quaternion.copy(this.q);
+        const leftOfAim = new THREE.Vector3(aimDir.z, 0, -aimDir.x).normalize();
+        // cotovelo esquerdo quase reto, levemente para baixo e para fora
         rig.joints.upperArmL.getWorldPosition(this.pole);
-        this.pole.y -= 0.6;
+        this.pole.addScaledVector(leftOfAim, 0.4).y -= 0.5;
         solveTwoBoneIK(rig.joints.upperArmL, rig.joints.forearmL, ARM_UPPER, ARM_FORE, grip, this.pole, 1);
+        // mão direita na corda; na puxada completa chega perto da bochecha
         const stringPos = this.v2.copy(grip).addScaledVector(aimDir, -0.1 - p.bowDraw * 0.55);
-        rig.joints.upperArmR.getWorldPosition(this.pole);
-        this.pole.addScaledVector(yawToDir(p.aim.yaw, new THREE.Vector3()), -0.6).y += 0.1;
+        // cotovelo direito alto e atrás (linha da flecha)
+        this.pole.copy(stringPos).addScaledVector(aimDir, -0.6).addScaledVector(leftOfAim, -0.35).y += 0.35;
         solveTwoBoneIK(rig.joints.upperArmR, rig.joints.forearmR, ARM_UPPER, ARM_FORE, stringPos, this.pole, 1);
       } else if (sheathed) {
         rig.sockets.back.localToWorld(model.root.position.copy(SHEATH_OFFSET).setX(0.05));

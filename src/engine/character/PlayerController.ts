@@ -553,11 +553,13 @@ export class PlayerController implements Damageable {
   }
 
   bowOrigin(out: THREE.Vector3) {
-    // mão do arco (lógica): à frente do ombro esquerdo, na altura do peito
-    const f = yawToDir(this.aim.yaw, this.tmp2);
+    // mão do arco (lógica): braço esquerdo esticado na direção da mira, na altura do ombro
+    // (com o corpo de lado, o ombro esquerdo fica praticamente na linha da mira)
+    const cp = Math.cos(this.aim.pitch);
+    this.tmp2.set(Math.sin(this.aim.yaw) * cp, Math.sin(this.aim.pitch), Math.cos(this.aim.yaw) * cp);
     out.copy(this.position);
-    out.y += 1.45;
-    out.addScaledVector(f, 0.45);
+    out.y += 1.4;
+    out.addScaledVector(this.tmp2, 0.72);
     return out;
   }
 

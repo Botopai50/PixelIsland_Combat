@@ -124,8 +124,8 @@ export class CameraRig implements AimSource {
     const vis = p.motor.visualStepOffset;
     this.pivot.copy(p.position);
     this.pivot.y += T.camHeight + vis + this.landDip.value * 0.03;
-    const shoulder = T.camShoulder * lerp(1, 1.25, this.aimBlend) * this.shoulderBlend;
-    const wantDist = lerp(T.camDistance, 1.9, this.aimBlend) * (p.lockTarget ? 1.08 : 1);
+    const shoulder = lerp(T.camShoulder, Math.max(T.camShoulder, 0.55) * 1.45, this.aimBlend) * this.shoulderBlend;
+    const wantDist = lerp(T.camDistance, 2.5, this.aimBlend) * (p.lockTarget ? 1.08 : 1);
     // colisão: primeiro para o lado (ombro), depois para trás
     const sideHit = this.ctx.physics.raycast(this.pivot, this.tmp2.copy(right).multiplyScalar(Math.sign(shoulder) || 1), Math.abs(shoulder) + 0.2, (c) => c.blocksCamera);
     const sideLen = sideHit ? Math.max(0, sideHit.distance - 0.2) * Math.sign(shoulder) : shoulder;
