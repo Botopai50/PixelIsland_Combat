@@ -185,9 +185,9 @@ export class PlayerView {
         const { pivot, reach: reach0 } = pivotFor(def);
         const reach = reach0;
         this.hand.copy(pivot).addScaledVector(this.dir, reach);
-        // machado carregado (golpe lateral): pose de TACO — mãos junto ao ombro
-        // direito, machado quase de pé, gume para a frente; no início do golpe
-        // desce suavemente dessa pose para a lateral
+        // machado carregado (golpe lateral): armado NA ALTURA DO GOLPE — mãos na
+        // lateral direita da cintura, machado quase horizontal puxado para a
+        // direita e um pouco para trás, gume para a frente; no golpe segue reto
         if (def.id === 'axeCharged') {
           let k = 0;
           if (p.state === 'charge') k = 1;
@@ -195,8 +195,8 @@ export class PlayerView {
           if (k > 0) {
             const ck = clamp01(p.chargeT / T.chargeTime);
             const tr = p.state === 'charge' ? Math.sin(p.time * 40) * 0.025 * ck : 0;
-            const bh = this.v.set(-0.26, 1.4 + 0.04 * ck, 0.1);
-            const bd = this.v2.set(-0.22 + tr, 0.95, -0.18 - 0.06 * ck).normalize();
+            const bh = this.v.set(-0.3, 1.12, 0.12 - 0.05 * ck);
+            const bd = this.v2.set(-0.82, 0.22 + tr, -0.35 - 0.15 * ck).normalize();
             this.hand.lerp(bh, k);
             this.dir.lerp(bd, k).normalize();
             this.edge.lerp(this.v2.set(0.15, 0, 1).normalize(), k).normalize();
