@@ -43,6 +43,8 @@ export interface AnimInput {
   attackOverhead?: boolean;
   /** Pose de trabalho com ferramenta. */
   attackWork?: 'chop' | 'mine';
+  /** Golpe de salto no ar (pernas recolhidas, corpo gira para a frente no corte). */
+  attackAir?: boolean;
   spinYaw: number;
   crouch: number;
   dodgeType: DodgeType;
@@ -365,6 +367,27 @@ export class HumanoidAnimator {
         P.thighL.x = lerp(P.thighL.x, -0.45, 0.6);
         P.shinR.x = lerp(P.shinR.x, 0.35, 0.6);
         P.shinL.x = lerp(P.shinL.x, 0.3, 0.6);
+        // ---- golpe de salto: nada de base firme; pernas recolhidas e o corpo
+        // inteiro "fecha" para a frente acompanhando o corte de cima para baixo
+        if (s.attackAir) {
+          const k = s.attackBody ?? 0;
+          const commit = Math.max(0, k), antic = Math.max(0, -k);
+          P.thighR.x = -0.35 - 0.75 * commit + 0.2 * antic;
+          P.thighL.x = -1.0 - 0.3 * commit + 0.15 * antic;
+          P.shinR.x = 0.9 + 0.5 * commit;
+          P.shinL.x = 1.3 + 0.2 * commit;
+          P.thighR.z = -0.1; P.thighL.z = 0.12;
+          // ergue (arqueia para trás) e depois dobra forte para a frente
+          P.spine.x += -0.35 * antic + 0.55 * commit;
+          P.chest.x += -0.2 * antic + 0.25 * commit;
+          P.head.x += 0.25 * antic - 0.15 * commit;
+          targetBodyRotX = -0.25 * antic + 0.35 * commit;
+          bodyYOffset += 0.1 * antic;
+          // braço livre abre para equilibrar
+          P.upperArmL.z += 0.6 * antic + 0.3 * commit;
+          P.upperArmL.x += -0.5 * antic + 0.4 * commit;
+          break;
+        }
         // ---- corpo inteiro no golpe (espada)
         const M = s.attackMotion ?? 0;
         if (M > 0) {

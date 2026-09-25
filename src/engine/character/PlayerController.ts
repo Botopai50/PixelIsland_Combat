@@ -42,6 +42,11 @@ interface AttackRun {
   wallHit: boolean;
   /** Inclinação do golpe seguindo a mira (rad, + = para cima). */
   aimPitch: number;
+  /** Golpe de salto (começou no ar). */
+  air?: boolean;
+  /** Já bateu no chão (golpe de salto). */
+  slammed?: boolean;
+  plunged?: boolean;
   flurry?: boolean;
   missed?: boolean;
 }
@@ -449,10 +454,16 @@ export class PlayerController implements Damageable {
   private startComboAttack() {
     const w = this.weapon;
     if (!w || w.combo.length === 0) return;
-    if (!this.motor.grounded && this.motor.timeSinceGrounded > 0.1 && w.air) {
+    if (!this.motor.grounded && (this.jumpedSinceGround || this.motor.timeSinceGrounded > 0.1) && w.air) {
       if (this.airAttackUsed) return;
       this.airAttackUsed = true;
-      this.startAttack(ATTACKS[w.air]);
+      if (this.startAttack(ATTACKS[w.air]) && this.attack) {
+        // golpe de salto: pulinho para ganhar altura e ERGUER a arma
+        this.attack.air = true;
+        const v = this.motor.velocity;
+        v.y = Math.max(v.y, 3.2);
+        this.airSpeed = Math.max(this.airSpeed * 0.9, 2.2);
+      }
       return;
     }
     if (this.time > this.comboResetAt) this.comboIndex = 0;
@@ -996,6 +1007,20 @@ export class PlayerController implements Damageable {
         const a = this.attack!;
         const t = this.stateT;
         const tm = a.timing;
+        if (a.air) {
+          // no ar: mantém o embalo para a frente (não "trava" no ar)
+          const fwdA = yawToDir(a.yaw, this.tmp);
+          const sp = a.slammed ? 0 : this.airSpeed;
+          v.x = approach(v.x, fwdA.x * sp, decel * dt * 0.5);
+          v.z = approach(v.z, fwdA.z * sp, decel * dt * 0.5);
+          // começa o corte: mergulha em direção ao chão
+          if (t >= tm.windup && !a.plunged && !m.grounded) {
+            a.plunged = true;
+            v.y = Math.min(v.y, -11);
+          }
+          this.facing = dampAngle(this.facing, a.yaw, 30, dt);
+          break;
+        }
         // avanço (lunge) na preparação/golpe, travado no fim
         let lunge = 0;
         if (t < tm.windup + tm.active) lunge = a.def.lunge * (t < tm.windup ? 0.6 : 1);
@@ -1101,14 +1126,24 @@ export class PlayerController implements Damageable {
     // gravidade (queda mais pesada que subida → salto com peso)
     if (!m.grounded || v.y > 0) {
       const gMul = v.y < 0 ? T.fallGravityMul : 1;
-      const floaty = this.state === 'attack' && this.attack?.def.id === this.weapon?.air ? 0.4 : 1;
+      // golpe de salto: quase para no alto enquanto ergue a arma, depois despenca
+      const air = this.state === 'attack' && this.attack?.air ? this.attack : null;
+      const floaty = air ? (this.stateT < air.timing.windup ? 0.3 : 1.6) : 1;
       v.y -= T.gravity * gMul * floaty * dt;
       v.y = Math.max(v.y, -40);
     }
 
     m.update(dt);
 
-    if (m.landedThisFrame) {
+    if (m.landedThisFrame && this.state === 'attack' && this.attack?.air && !this.attack.slammed) {
+      // pancada no chão: impacto forte e recuperação curta
+      const a = this.attack;
+      a.slammed = true;
+      v.x *= 0.2;
+      v.z *= 0.2;
+      this.ctx.events.emit('land', { pos: this.position.clone(), intensity: 0.85, surface: m.surface, player: true });
+      this.ctx.shake.add(0.35);
+    } else if (m.landedThisFrame) {
       const intensity = clamp01((m.landSpeed - 3) / 14);
       this.ctx.events.emit('land', { pos: this.position.clone(), intensity, surface: m.surface, player: true });
     }
@@ -1218,6 +1253,7 @@ export class PlayerController implements Damageable {
     s.attackTwist = 0;
     s.attackMotion = 0;
     s.attackWork = undefined;
+    s.attackAir = false;
     s.spinYaw = 0;
     const map: Record<PlayerState, AnimAction> = {
       move: 'none', attack: 'attack', charge: 'charge', dodge: 'dodge', bow: 'bow', bowRecover: 'bow',
@@ -1242,6 +1278,7 @@ export class PlayerController implements Damageable {
         s.attackMotion = a.def.bodyMotion ?? 0;
         s.attackOverhead = !!a.def.overhead;
         s.attackWork = a.def.work;
+        s.attackAir = !!a.air && !a.slammed;
         if (a.def.spin) {
           const ang = this.swingAngle;
           s.spinYaw = ((60 - ang) * Math.PI) / 180;
