@@ -45,6 +45,8 @@ export interface AnimInput {
   attackWork?: 'chop' | 'mine';
   /** Golpe de salto no ar (pernas recolhidas, corpo gira para a frente no corte). */
   attackAir?: boolean;
+  /** Ataque giratório (carga e giro). */
+  attackSpin?: boolean;
   spinYaw: number;
   crouch: number;
   dodgeType: DodgeType;
@@ -367,6 +369,36 @@ export class HumanoidAnimator {
         P.thighL.x = lerp(P.thighL.x, -0.45, 0.6);
         P.shinR.x = lerp(P.shinR.x, 0.35, 0.6);
         P.shinL.x = lerp(P.shinL.x, 0.3, 0.6);
+        // ---- ataque giratório: base baixa e larga; na carga o tronco torce para
+        // trás "enrolando a mola"; no giro o corpo inclina para dentro, a cabeça
+        // puxa o giro e o braço livre abre para equilibrar
+        if (s.attackSpin) {
+          const k = s.attackBody ?? 0;
+          const charging = s.action === 'charge' ? 1 : 0;
+          const wind = Math.max(charging, Math.max(0, -k));
+          const spin = s.action === 'attack' ? Math.max(0, k) : 0;
+          const low = Math.max(wind, spin);
+          P.thighR.z = -0.34 * low; P.thighL.z = 0.34 * low;
+          P.thighR.x = 0.05 - 0.2 * low; P.thighL.x = -0.3 * low;
+          P.shinR.x = 0.65 * low; P.shinL.x = 0.6 * low;
+          P.footR.x = -0.3 * low; P.footL.x = -0.2 * low;
+          bodyYOffset -= 0.16 * low;
+          // carga: torce para a direita, olhar fica à frente, braço do escudo à frente
+          P.pelvis.y += -0.25 * wind;
+          P.spine.y += -0.55 * wind; P.chest.y += -0.35 * wind;
+          P.head.y += 0.8 * wind;
+          P.spine.x += 0.3 * wind + 0.28 * spin;
+          P.upperArmL.x += -0.7 * wind; P.upperArmL.z += 0.35 * wind;
+          P.forearmL.x -= 0.4 * wind;
+          // giro: cabeça adianta, corpo inclina para dentro, braço aberto
+          P.head.y += 0.35 * spin;
+          P.chest.y += 0.2 * spin;
+          targetBodyRotZ += 0.16 * spin;
+          P.upperArmL.z += 0.65 * spin; P.upperArmL.x += -0.1 * spin;
+          P.forearmL.x -= 0.35 * spin;
+          targetBodyYaw = s.spinYaw;
+          break;
+        }
         // ---- golpe de salto: nada de base firme; pernas recolhidas e o corpo
         // inteiro "fecha" para a frente acompanhando o corte de cima para baixo
         if (s.attackAir) {

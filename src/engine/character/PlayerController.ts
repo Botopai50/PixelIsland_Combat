@@ -1254,6 +1254,7 @@ export class PlayerController implements Damageable {
     s.attackMotion = 0;
     s.attackWork = undefined;
     s.attackAir = false;
+    s.attackSpin = false;
     s.spinYaw = 0;
     const map: Record<PlayerState, AnimAction> = {
       move: 'none', attack: 'attack', charge: 'charge', dodge: 'dodge', bow: 'bow', bowRecover: 'bow',
@@ -1279,6 +1280,7 @@ export class PlayerController implements Damageable {
         s.attackOverhead = !!a.def.overhead;
         s.attackWork = a.def.work;
         s.attackAir = !!a.air && !a.slammed;
+        s.attackSpin = !!a.def.spin;
         if (a.def.spin) {
           const ang = this.swingAngle;
           s.spinYaw = ((60 - ang) * Math.PI) / 180;
@@ -1290,6 +1292,7 @@ export class PlayerController implements Damageable {
         s.attackMotion = 0;
         const cd = this.weapon?.charged ? ATTACKS[this.weapon.charged] : null;
         s.attackWork = cd?.work;
+        s.attackSpin = !!cd?.spin;
         s.attackBody = -0.9;
         s.actionU = clamp01(this.chargeT / this.ctx.tuning.chargeTime);
         s.attackTwist = cd?.work === 'mine' ? 0 : 0.5;
