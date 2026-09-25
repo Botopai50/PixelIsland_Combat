@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GameContext } from '../core/Context';
 import type { PlayerController } from '../character/PlayerController';
-import { createWeaponModel, BOW_DRAW_LEN, type WeaponModel } from '../items/WeaponModels';
+import { createWeaponModel, createShieldBacking, BOW_DRAW_LEN, type WeaponModel } from '../items/WeaponModels';
 import { ATTACKS, TWO_HAND_GRIP } from '../combat/Attacks';
 import { viewmodelStyle, viewmodelSwingPose } from './ViewmodelSwings';
 import { SlashTrail } from '../vfx/Trail';
@@ -36,6 +36,8 @@ export class FirstPersonView {
   private attackW = 0;
   /** Escudo recolhe para baixo durante o golpe: o arco da lâmina fica legível. */
   private shieldTuck = 0;
+  private guardS = new Spring(300, 21);
+  private wasGuarding = false;
   /** Tela estreita (celular em pé): armas menores e mais perto do centro. */
   private vmScale = 1;
   private equipScale = 1;
@@ -68,6 +70,7 @@ export class FirstPersonView {
       this.models.set(id, m);
     }
     this.shield = createWeaponModel('shield');
+    this.shield.root.add(createShieldBacking());
     this.root.add(this.shield.root);
     this.armR = this.makeArm();
     this.armL = this.makeArm();
@@ -265,26 +268,41 @@ export class FirstPersonView {
     const toolMain = main === 'axe' || main === 'pickaxe';
     sh.root.visible = p.offHand === 'shield' && main !== 'bow' && !toolMain;
     if (sh.root.visible) {
-      const g = p.guardAmount;
+      // levantar/abaixar com mola (sobe rápido e "assenta" com leve passagem)
+      const guardOn = p.guarding || p.state === 'guardHit';
+      if (guardOn && !this.wasGuarding) this.guardS.impulse(4);
+      this.wasGuarding = guardOn;
+      this.guardS.target = guardOn ? 1 : 0;
+      this.guardS.update(Math.max(dt, 1 / 240));
+      const g = clamp(this.guardS.value, -0.1, 1.15);
       const tuckTo = p.state === 'attack' ? 1 : 0;
       this.shieldTuck += (tuckTo - this.shieldTuck) * (1 - Math.exp(-dt * (tuckTo ? 18 : 7)));
-      const tk = this.shieldTuck * (1 - g);
-      // descanso: baixo à esquerda, quase de perfil | defesa: à esquerda da mira,
-      // de frente, longe o bastante para não tapar a tela (a mira fica livre)
-      const pos = this.v2.set(lerp(-0.36, -0.21, g), lerp(-0.38, -0.17, g), lerp(-0.48, -0.6, g)).add(offset);
-      pos.z += this.shieldKick.value * 0.05;
-      pos.y -= lower * 0.5 + tk * 0.2;
-      pos.x -= tk * 0.1;
+      const tk = this.shieldTuck * (1 - clamp01(g));
+      // descanso: canto inferior esquerdo, DE FRENTE (vê-se a borda e o lado de
+      // dentro) | defesa: à frente, levemente à esquerda, borda de cima logo
+      // abaixo da mira — dá para ver o inimigo por cima do escudo
+      const arc = Math.sin(clamp01(g) * Math.PI);
+      // altura pela metade do escudo em tela: a borda de cima fica sempre no mesmo lugar
+      const half = 0.36 * 0.8 * aspectK;
+      const pos = this.v2.set(lerp(-0.4, -0.13, g), lerp(-0.13 - half, -0.04 - half, g) + arc * 0.03, lerp(-0.56, -0.54, g) - arc * 0.05).add(offset);
+      pos.y += Math.sin(p.time * 2.1) * 0.004 * clamp01(g);
+      pos.z += this.shieldKick.value * 0.06;
+      pos.y -= lower * 0.5 + tk * 0.22 - this.shieldKick.value * 0.015;
+      pos.x -= tk * 0.08;
       pos.x *= aspectK;
       sh.root.position.copy(pos);
       sh.root.scale.setScalar(0.8 * aspectK);
-      sh.root.quaternion.setFromEuler(new THREE.Euler(lerp(0.12, -0.04, g) - this.shieldKick.value * 0.1, Math.PI + lerp(-0.95, -0.3, g), lerp(0.18, 0.06, g)));
+      sh.root.quaternion.setFromEuler(new THREE.Euler(
+        lerp(0.2, -0.1, g) - this.shieldKick.value * 0.14,
+        Math.PI + lerp(-0.5, -0.1, g),
+        lerp(0.16, 0.03, g) + this.shieldKick.value * 0.03,
+      ));
       sh.setGlow(p.state === 'guardHit' ? 0.3 : 0);
       if (!this.armL.visible) {
-        // mão fechada na alça, antebraço preso nas tiras por trás do escudo
+        // mão na alça (centro), antebraço vem de baixo passando pelas tiras
         sh.root.updateMatrix();
         const grip = this.hand.set(0, -0.02, -0.05).applyMatrix4(sh.root.matrix);
-        const elbow = this.dir.set(0.3, -0.1, -0.1).applyMatrix4(sh.root.matrix);
+        const elbow = this.dir.set(0.08, -0.45, -0.16).applyMatrix4(sh.root.matrix);
         this.placeArm(this.armL, grip, -1, elbow);
       }
     }

@@ -128,6 +128,28 @@ export function createClub(): WeaponModel {
   return { root: g, setGlow: glowFn(w, 0xff4040), kind: 'club' };
 }
 
+/**
+ * Lado de dentro do escudo (tábuas + tiras de couro), usado só no viewmodel da
+ * 1ª pessoa, onde o jogador enxerga as costas do escudo. A 3ª pessoa não usa.
+ */
+export function createShieldBacking(): THREE.Group {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.34);
+  shape.lineTo(0.26, 0.26);
+  shape.lineTo(0.25, -0.05);
+  shape.quadraticCurveTo(0.2, -0.28, 0, -0.38);
+  shape.quadraticCurveTo(-0.2, -0.28, -0.25, -0.05);
+  shape.lineTo(-0.26, 0.26);
+  shape.closePath();
+  const g = new THREE.Group();
+  const back = mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.012, bevelEnabled: false }), mats.lightWood(), 0, 0, 0.006);
+  back.scale.set(0.94, 0.94, 1);
+  const strap1 = mesh(new THREE.BoxGeometry(0.4, 0.035, 0.012), mats.leather(), 0.03, -0.12, 0.0);
+  const strap2 = mesh(new THREE.BoxGeometry(0.4, 0.035, 0.012), mats.leather(), 0.03, 0.1, 0.0);
+  g.add(back, strap1, strap2);
+  return g;
+}
+
 /** Escudo: frente = +Z, alça na origem. */
 export function createShield(): WeaponModel {
   const g = new THREE.Group();
@@ -150,13 +172,7 @@ export function createShield(): WeaponModel {
   emblem.scale.set(1, 1.3, 0.4);
   const boss = mesh(new THREE.SphereGeometry(0.05, 6, 4), rim, 0, 0.2, 0.11);
   const handle = mesh(new THREE.BoxGeometry(0.04, 0.16, 0.04), mats.leather(), 0, 0, 0.0);
-  // lado de dentro: tábuas de madeira + tiras de couro (lê como "costas" do escudo)
-  const backGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.012, bevelEnabled: false });
-  const back = mesh(backGeo, mats.wood(), 0, 0, 0.006);
-  back.scale.set(0.94, 0.94, 1);
-  const strap1 = mesh(new THREE.BoxGeometry(0.4, 0.035, 0.012), mats.leather(), 0.06, -0.12, 0.0);
-  const strap2 = mesh(new THREE.BoxGeometry(0.4, 0.035, 0.012), mats.leather(), 0.06, 0.1, 0.0);
-  g.add(r, body, back, strap1, strap2, emblem, boss, handle);
+  g.add(r, body, emblem, boss, handle);
   return { root: g, setGlow: glowFn(face, 0x7ff6ff), kind: 'shield' };
 }
 
