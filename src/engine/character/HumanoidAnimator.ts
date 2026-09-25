@@ -232,6 +232,15 @@ export class HumanoidAnimator {
     const idle = 1 - moving;
     this.readyW = damp(this.readyW, s.ready ?? 0, 6, dt);
     const rdy = this.readyW * idle * (1 - s.guard), rlx = (1 - this.readyW) * idle * (1 - s.guard);
+    // em movimento com a arma na mão: o braço ARMADO quase não bombeia — fica
+    // baixo, um pouco atrás e afastado do corpo (a arma não fica balançando);
+    // o outro braço continua o ciclo normal
+    const armed = this.readyW * moving * (1 - s.guard);
+    if (armed > 0.001) {
+      P.upperArmR.x = lerp(P.upperArmR.x, 0.6 + sn * lerp(0.1, 0.16, run), armed);
+      P.upperArmR.z = lerp(P.upperArmR.z, -0.28, armed);
+      P.forearmR.x = lerp(P.forearmR.x, -0.5 - 0.15 * run, armed);
+    }
     const breathe = Math.sin(this.t * (s.exhausted ? 6 : 2.1));
     P.chest.x += breathe * (s.exhausted ? 0.06 : 0.025) * idle;
     P.upperArmR.z -= breathe * 0.02 * idle;
