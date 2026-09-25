@@ -377,7 +377,13 @@ export class HumanoidAnimator {
     this.airFromJump = !s.grounded && (this.airFromJump || (this.wasGrounded && s.vy > 2));
     // aterrissagem proporcional à velocidade de queda (≈ altura)
     if (!s.grounded) this.airVy = s.vy;
-    if (s.grounded && !this.wasGrounded) this.land(clamp01((-this.airVy - 2) / 13));
+    if (s.grounded && !this.wasGrounded) {
+      const k = clamp01((-this.airVy - 2) / 13);
+      // pousou ATACANDO (pancada do golpe aéreo): o golpe já é o impacto — na pose
+      // conta só como aterrissagem leve (senão, ao terminar o golpe, cai na pose
+      // pesada agachado com a arma apontada para o chão)
+      this.land(s.action === 'attack' ? Math.min(k, 0.25) : k);
+    }
     this.wasGrounded = s.grounded;
 
     // aterrissagem em níveis: leve (dobra os joelhos) · média (agacha, braços à
