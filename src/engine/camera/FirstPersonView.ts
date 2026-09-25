@@ -37,6 +37,7 @@ export class FirstPersonView {
   /** Escudo recolhe para baixo durante o golpe: o arco da lâmina fica legível. */
   private shieldTuck = 0;
   private climbHide = 0;
+  private wasMantle = false;
   private camInv = new THREE.Matrix4();
   private cw = new THREE.Vector3();
   private ce = new THREE.Vector3();
@@ -173,7 +174,12 @@ export class FirstPersonView {
     if (p.state === 'equip' && p.stateT < 0.14) lower = (p.stateT / 0.14) * 0.35;
     if (p.state === 'hurt') lower += Math.sin(clamp01(p.stateT / 0.4) * Math.PI) * 0.06;
     // escalando: arma e escudo saem da tela (mãos na parede)
-    this.climbHide = damp(this.climbHide, p.state === 'climb' || p.state === 'mantle' ? 1 : 0, 10, dt);
+    const climbingNow = p.state === 'climb' || p.state === 'mantle';
+    // terminou a subida da borda: as mãos já subiram até a pose normal → arma
+    // aparece direto na mão (sem descer e voltar por baixo)
+    if (this.wasMantle && !climbingNow) this.climbHide = 0;
+    this.wasMantle = p.state === 'mantle';
+    this.climbHide = damp(this.climbHide, climbingNow ? 1 : 0, 10, dt);
     lower += this.climbHide * 0.6;
     offset.y -= lower;
 
@@ -365,16 +371,8 @@ export class FirstPersonView {
     for (const side of [1, -1] as const) {
       const t = this.cw;
       if (mantle) {
-        // em cima da borda; quando o corpo passa por cima as mãos vêm junto
-        // (empurrando o chão ao lado do corpo) e no fim saem por baixo
+        // em cima da borda (depois desprende e sobe com a câmera, mais abaixo)
         t.set(w.x + rx * 0.2 * side - n.x * 0.2, w.y + 0.03, w.z + rz * 0.2 * side - n.z * 0.2);
-        const follow = Math.min(1, Math.max(0, (u - 0.45) / 0.3));
-        if (follow > 0) {
-          const fx = -n.x, fz = -n.z;
-          t.x += (p.position.x + fx * 0.32 + rx * 0.2 * side - t.x) * follow;
-          t.z += (p.position.z + fz * 0.32 + rz * 0.2 * side - t.z) * follow;
-        }
-        t.y -= Math.max(0, (u - 0.75) / 0.25) * 0.6;
       } else {
         const a = Math.sin(cp) * mv * side; // + = esta mão alta
         const rising = Math.max(0, Math.cos(cp) * side) * mv; // esta mão subindo: desgruda
@@ -404,6 +402,17 @@ export class FirstPersonView {
       e.y -= 0.1;
       t.applyMatrix4(this.camInv);
       e.applyMatrix4(this.camInv);
+      if (mantle) {
+        // corpo passou da borda: a mão DESPRENDE e sobe junto com a câmera até
+        // a pose normal (direita: empunhadura · esquerda: escudo)
+        const r0 = Math.min(1, Math.max(0, (u - 0.3) / 0.45));
+        const r = r0 * r0 * (3 - 2 * r0);
+        if (r > 0) {
+          const rest = this.v2.set(side === 1 ? 0.27 : -0.27, -0.22, -0.5);
+          t.lerp(rest, r);
+          e.lerp(this.v2.set(rest.x + side * 0.12, rest.y - 0.3, rest.z + 0.32), r);
+        }
+      }
       // entra/sai de baixo da tela
       t.y -= (1 - k) * 0.6;
       e.y -= (1 - k) * 0.6;
