@@ -47,6 +47,8 @@ export interface AnimInput {
   attackAir?: boolean;
   /** Ataque giratório (carga e giro). */
   attackSpin?: boolean;
+  /** Esgueirando (agachado, passos cuidadosos). */
+  sneak?: boolean;
   spinYaw: number;
   crouch: number;
   dodgeType: DodgeType;
@@ -83,6 +85,7 @@ export class HumanoidAnimator {
   private bodyRotX = 0;
   private bodyRotZ = 0;
   private bodyYaw = 0;
+  private sneakW = 0;
   private bodyY = 0;
   private lean = 0;
   private wasGrounded = true;
@@ -327,6 +330,22 @@ export class HumanoidAnimator {
     P.thighR.x -= cr * 0.5; P.thighL.x -= cr * 0.5;
     P.shinR.x += cr * 0.9; P.shinL.x += cr * 0.9;
     P.footR.x -= cr * 0.4; P.footL.x -= cr * 0.4;
+
+    // ---------------------------------------------------------------- esgueirar
+    // agachado, tronco à frente, cabeça erguida olhando adiante, braços dobrados
+    // à frente e pisando na ponta dos pés (o ciclo de marcha continua por cima)
+    this.sneakW = damp(this.sneakW, s.sneak && s.action !== 'dodge' ? 1 : 0, 8, dt);
+    const sk = this.sneakW;
+    if (sk > 0.001) {
+      P.thighR.x -= 0.75 * sk; P.thighL.x -= 0.75 * sk;
+      P.shinR.x += 1.15 * sk; P.shinL.x += 1.15 * sk;
+      P.footR.x -= 0.35 * sk; P.footL.x -= 0.35 * sk;
+      P.spine.x += 0.45 * sk; P.chest.x += 0.1 * sk;
+      P.head.x -= 0.4 * sk;
+      P.upperArmR.x -= 0.3 * sk; P.upperArmL.x -= 0.3 * sk;
+      P.upperArmR.z -= 0.22 * sk; P.upperArmL.z += 0.22 * sk;
+      P.forearmR.x -= 0.8 * sk; P.forearmL.x -= 0.8 * sk;
+    }
 
     // ---------------------------------------------------------------- defesa
     const g = s.guard;
@@ -674,6 +693,6 @@ export class HumanoidAnimator {
     const sy = 1 + stretch - li * 0.16;
     this.squash = damp(this.squash, sy, 25, dt);
     b.scale.set(1 / Math.sqrt(this.squash), this.squash, 1 / Math.sqrt(this.squash));
-    b.position.y = this.rig.bodyPivotY + this.bodyY - li * 0.2 - cr * 0.12 + bob;
+    b.position.y = this.rig.bodyPivotY + this.bodyY - li * 0.2 - cr * 0.12 - this.sneakW * 0.17 + bob;
   }
 }

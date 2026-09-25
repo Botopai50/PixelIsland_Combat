@@ -300,7 +300,9 @@ export class Enemy implements Damageable, Threat {
         if (this.stateT >= this.stateDur) this.setState('idle');
         break;
       case 'idle':
-        if (target?.alive && dist < 22) this.setState('chase');
+        // jogador esgueirando só é percebido de perto
+        const sight = (target as { sneaking?: boolean } | null)?.sneaking ? 8 : 22;
+        if (target?.alive && dist < sight) this.setState('chase');
         break;
       case 'chase': {
         if (!target?.alive) {

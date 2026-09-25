@@ -108,6 +108,10 @@ export class PlayerController implements Damageable {
   // defesa
   guarding = false;
   guardAmount = 0;
+  /** Esgueirando (Ctrl liga/desliga, como no BotW): agachado, lento e silencioso. */
+  sneaking = false;
+  /** 0..1 suavizado (câmera, sons). */
+  sneakAmount = 0;
   private guardPressAt = -10;
 
   // esquiva
@@ -333,6 +337,7 @@ export class PlayerController implements Damageable {
     this.setState('dead');
     this.respawnAt = this.time + 3;
     this.lockTarget = null;
+    this.sneaking = false;
     this.ctx.events.emit('playerDeath', undefined);
   }
 
@@ -700,6 +705,10 @@ export class PlayerController implements Damageable {
     const attackReleased = inp.wasReleased('attack');
     // Esquiva como no BotW: só com a mira travada, e aí o botão de PULAR esquiva
     // (Ctrl/C/L também, mas só travado). Sem travar, pular pula.
+    // esgueirar: Ctrl liga/desliga; correr, pular ou esquivar saem
+    if (inp.consume('sneak')) this.sneaking = !this.sneaking;
+    if (this.sneaking && (inp.wasPressed('sprint') || (inp.runLock && Math.hypot(inp.moveX, inp.moveY) > 0.3) || inp.wasPressed('jump') || this.state === 'dodge')) this.sneaking = false;
+    this.sneakAmount = damp(this.sneakAmount, this.sneaking ? 1 : 0, 8, dt);
     const locked = !!this.lockTarget;
     const dodgeKey = inp.consume('dodge');
     const dodgePressed = locked && (dodgeKey || inp.wasPressed('jump'));
@@ -985,7 +994,8 @@ export class PlayerController implements Damageable {
         } else {
           // dois estados claros: ANDAR (padrão) e CORRER (segurando Correr/Shift)
           maxSpeed = T.walkSpeed * Math.min(1, mag / 0.8) * (this.exhausted ? 0.75 : 1);
-          if (wantSprint && m.grounded) {
+          if (this.sneaking) maxSpeed *= 0.55;
+          else if (wantSprint && m.grounded) {
             maxSpeed = T.runSpeed;
             this.sprinting = true;
             this.useStamina(T.sprintCost * dt);
@@ -1249,6 +1259,7 @@ export class PlayerController implements Damageable {
     s.walkSpeed = this.ctx.tuning.walkSpeed;
     s.moveAngle = s.speed > 0.2 ? angleDelta(this.facing, dirToYaw(v.x, v.z)) : 0;
     // na esquiva nada de torção de strafe no quadril: travado fica igual a destravado
+    s.sneak = this.sneaking;
     s.strafing = this.state !== 'dodge' && (this.aim.firstPerson || !!this.lockTarget || this.guarding || this.state === 'bow' || this.state === 'bowRecover' || this.state === 'charge');
     s.grounded = this.motor.grounded;
     s.vy = v.y;

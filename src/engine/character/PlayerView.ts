@@ -62,7 +62,7 @@ export class PlayerView {
     this.footIK = new FootIK(ctx.physics);
     this.animator.onFootstep = (_foot, intensity) => {
       const p = player.position;
-      ctx.events.emit('footstep', { pos: p.clone(), surface: player.motor.surface, intensity, player: true });
+      ctx.events.emit('footstep', { pos: p.clone(), surface: player.motor.surface, intensity: intensity * (1 - 0.75 * player.sneakAmount), player: true });
     };
     ctx.scene.add(this.rig.root);
     ctx.scene.add(this.trail.mesh);

@@ -44,6 +44,7 @@ export class TouchControls {
       { action: 'attack', label: 'Atacar', cls: 'b-attack', hold: true },
       { action: 'guard', label: 'Defender', cls: 'b-guard', hold: true },
       { action: 'jump', label: 'Pular', cls: 'b-jump', hold: true },
+      { action: 'sneak', label: 'Agachar', cls: 'b-sneak', hold: true },
       { action: 'sprint', label: 'Correr', cls: 'b-sprint', toggle: true },
       { action: 'lock', label: 'Travar', cls: 'b-lock', hold: true },
     ];

@@ -176,7 +176,7 @@ export class CameraRig implements AimSource {
     const right = this.tmp.set(-Math.cos(this.yaw), 0, Math.sin(this.yaw));
     const vis = p.motor.visualStepOffset;
     this.pivot.copy(p.position);
-    this.pivot.y += T.camHeight + vis + this.landDip.value * 0.03 + J.lift;
+    this.pivot.y += T.camHeight + vis + this.landDip.value * 0.03 + J.lift - p.sneakAmount * 0.35;
     // pisadas da corrida: o pivô sobe/desce um pouco (3ª pessoa)
     if (T.camBob) this.pivot.y += (Math.abs(Math.sin(this.bobPhase * Math.PI * 2)) - 0.64) * 0.05 * this.runSway * T.camBobAmount * (1 - b);
     const shoulder = lerp(T.camShoulder, Math.max(T.camShoulder, 0.55) * 1.45, this.aimBlend) * this.shoulderBlend;
@@ -206,6 +206,7 @@ export class CameraRig implements AimSource {
     if (b >= 0.5 && p.motor.grounded) this.bobPhase += (speed * playerDt) / 1.9;
     const bobAmt = T.camBob ? T.camBobAmount * clamp01(speed / 6) : 0;
     const eye = new THREE.Vector3(0, EYE.y, EYE.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), p.facing).add(p.position);
+    eye.y -= p.sneakAmount * 0.42;
     eye.y += vis + Math.abs(Math.sin(this.bobPhase * Math.PI * 2)) * 0.018 * bobAmt + this.landDip.value * 0.05;
     eye.addScaledVector(right, Math.sin(this.bobPhase * Math.PI * 2) * 0.008 * bobAmt);
     if (p.state === 'dodge') eye.y -= Math.sin(clamp01(p.stateT / 0.35) * Math.PI) * (p.dodgeType === 'flip' ? 0.25 : 0.12);

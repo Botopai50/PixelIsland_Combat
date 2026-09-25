@@ -178,6 +178,7 @@ body.touch-mode .tweak-wrap.open { display: block; }
 .b-guard { width: 70px; height: 70px; right: 98px; bottom: 6px; border-color: #7fe3ff; }
 .b-jump { width: 66px; height: 66px; right: 12px; bottom: 100px; border-color: #a6f08a; }
 .b-jump.as-dodge { border-color: #ffffff; }
+.b-sneak { width: 58px; height: 58px; right: 92px; bottom: 90px; border-color: #b9a6ff; }
 .b-sprint { width: 54px; height: 54px; right: 178px; bottom: 90px; font-size: 11px; }
 .b-sprint.on { background: rgba(123,234,90,.45); transform: none; }
 .b-lock { width: 54px; height: 54px; right: 180px; bottom: 16px; font-size: 11px; border-color: #ffcf4a; }
