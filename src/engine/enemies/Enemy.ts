@@ -185,7 +185,7 @@ export class Enemy implements Damageable, Threat {
     const frontal = toAttacker.dot(fwd) > 0.2;
 
     // escudo de metal: bloqueia golpes frontais
-    if (hit.hurtbox.tag === 'shield' && frontal && this.state !== 'stagger') {
+    if (hit.hurtbox.tag === 'shield' && frontal && this.state !== 'stagger' && !hit.unblockable) {
       r.material = 'metal';
       r.blocked = true;
       this.shieldSpring.impulse(6 + hit.strength * 6);

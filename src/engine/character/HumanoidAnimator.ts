@@ -67,6 +67,7 @@ export class HumanoidAnimator {
   private bodyY = 0;
   private lean = 0;
   private wasGrounded = true;
+  private airVy = 0;
   /** Mola de recuo (usada ao bater/bloquear): empurra tronco e braços. */
   recoil = 0;
   private recoilV = 0;
@@ -171,7 +172,9 @@ export class HumanoidAnimator {
       P.spine.x = 0.1 - down * 0.15;
       bob = 0;
     }
-    if (s.grounded && !this.wasGrounded) this.land(Math.max(this.landImpact, 0.4));
+    // aterrissagem proporcional à velocidade de queda
+    if (!s.grounded) this.airVy = s.vy;
+    if (s.grounded && !this.wasGrounded) this.land(clamp01((-this.airVy - 2) / 12) * 0.9 + 0.15);
     this.wasGrounded = s.grounded;
 
     // aterrissagem: agacha proporcional ao impacto
@@ -359,7 +362,7 @@ export class HumanoidAnimator {
     this.bodyRotZ = damp(this.bodyRotZ, targetBodyRotZ, 12, dt);
     if (s.action === 'attack' && Math.abs(targetBodyYaw) > 0.01) this.bodyYaw = targetBodyYaw;
     else this.bodyYaw = damp(this.bodyYaw, targetBodyYaw, 10, dt);
-    this.bodyY = damp(this.bodyY, bodyYOffset - bob * 0 , 20, dt);
+    this.bodyY = damp(this.bodyY, bodyYOffset, 20, dt);
     const b = this.rig.body;
     b.rotation.set(this.bodyRotX, this.bodyYaw, this.bodyRotZ, 'YXZ');
     b.position.y = this.rig.bodyPivotY + this.bodyY - li * 0.14 - cr * 0.12 + bob;

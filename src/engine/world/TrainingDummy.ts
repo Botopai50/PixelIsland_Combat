@@ -126,7 +126,7 @@ export class TrainingDummy implements Damageable {
     this.body.rotation.set(this.tiltX.value * 0.12, this.twist.value * 0.1, this.tiltZ.value * 0.12);
     this.comboT -= dt;
     this.flashT -= dt;
-    const k = this.flashT > 0 ? 0.8 : 0;
+    const k = this.flashT > 0 ? 0.45 : 0;
     for (const m of this.mats) m.emissive.setScalar(k);
     this.updateHurtboxes();
   }

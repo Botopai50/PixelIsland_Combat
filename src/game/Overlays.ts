@@ -14,18 +14,19 @@ export const CONTROLS_DESKTOP: [string, string][] = [
   ['G', 'Gerar inimigo'],
   ['R', 'Restaurar arena'],
   ['P', 'Painel de ajustes'],
+  ['B', 'Comparar: juice ligado/desligado'],
   ['H', 'Ajuda'],
 ];
 
 export const CONTROLS_TOUCH: [string, string][] = [
   ['Lado esquerdo', 'Analógico: mover (leve = andar)'],
   ['Lado direito', 'Arrastar: olhar/mirar'],
-  ['Atacar', 'Toque = golpe · segure = carga · arco: segure e solte'],
+  ['Atacar', 'Toque = golpe · segure = carga · arco: segure e solte (arraste o botão para mirar)'],
   ['Defender', 'Segure para bloquear; toque no tempo certo = aparo'],
   ['Esquiva / Pular / Correr', 'Ações de movimento'],
   ['Travar', 'Lock-on no inimigo mais próximo'],
   ['Barra rápida', 'Toque para equipar'],
-  ['Topo', '1ª/3ª, ombro, itens, inimigo, reset, ajustes'],
+  ['Topo', '1ª/3ª, ombro, itens, inimigo, reset, juice on/off, ajustes'],
 ];
 
 const table = (rows: [string, string][]) =>

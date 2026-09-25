@@ -131,7 +131,7 @@ export class ImpactFX {
     const I = intensity;
     switch (mat) {
       case 'flesh': {
-        this.flash(pos, 0xfff1d0, 0.55 + I * 0.5, 0.07 + I * 0.03);
+        this.flash(pos, 0xfff1d0, 0.4 + I * 0.35, 0.06 + I * 0.03);
         for (let i = 0; i < this.n(10, I); i++) {
           this.sprayDir(normal, dir, 0.6, 0.8, 0.6, t);
           P.spawn('glow', { pos, vel: t.multiplyScalar(rand(4, 9) * (0.6 + I)), color: pick([0xffd28a, 0xffffff, 0xff9f5a]), size: rand(0.03, 0.06), life: rand(0.12, 0.25), drag: 6, stretch: 3, gravity: 6 });
@@ -143,7 +143,7 @@ export class ImpactFX {
         break;
       }
       case 'dummy': {
-        this.flash(pos, 0xfff4c8, 0.5 + I * 0.4, 0.07);
+        this.flash(pos, 0xfff4c8, 0.35 + I * 0.3, 0.06);
         for (let i = 0; i < this.n(14, I); i++) {
           this.sprayDir(normal, dir, 0.7, 0.7, 0.8, t);
           P.spawn('solid', { pos, vel: t.multiplyScalar(rand(2, 6) * (0.6 + I)), color: pick([0xe8cf7a, 0xd4b45c, 0xf2e2a0]), size: rand(0.12, 0.2), shape: [0.12, 0.12, 1], life: rand(0.6, 1.1), gravity: 7, drag: 2.5, floorY, spin: 10, endScale: 0.6 });
@@ -183,7 +183,7 @@ export class ImpactFX {
       }
       case 'metal': {
         // muitas faíscas refletidas + clarão forte
-        this.flash(pos, 0xfff2b0, 0.6 + I * 0.4, 0.08);
+        this.flash(pos, 0xfff2b0, 0.45 + I * 0.3, 0.07);
         this.flash(pos, 0xffc860, 0.35, 0.16, true, 3);
         // reflexão do golpe na superfície
         const r = this.tmp2.copy(dir).addScaledVector(normal, -2 * dir.dot(normal)).normalize();

@@ -226,6 +226,10 @@ export class Game {
       if (this.tweak.isOpen) document.exitPointerLock?.();
     }
     if (this.paused) return;
+    if (inp.consume('juice')) {
+      const on = this.tweak.toggleJuice();
+      this.hud.toast(on ? 'Juice LIGADO (hit stop, tremor, partículas…)' : 'Juice DESLIGADO — sinta a diferença', on ? 'good' : 'warn');
+    }
     if (inp.consume('spawn')) this.spawnEnemy();
     if (inp.consume('reset')) this.resetArena();
     if (inp.consume('walkToggle')) this.hud.toast(inp.walkMode ? 'Modo andar' : 'Modo correr', 'info');

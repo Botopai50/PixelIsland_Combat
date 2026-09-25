@@ -18,6 +18,7 @@ interface Arrow {
   wobble: number;
   wobbleAxis: THREE.Vector3;
   baseQuat: THREE.Quaternion;
+  falling?: boolean;
 }
 
 const FWD = new THREE.Vector3(0, 0, 1);
@@ -108,7 +109,7 @@ export class ProjectileSystem {
             ctx.scene.attach(a.mesh);
             a.pos.copy(targetHit.point);
             a.collectable = false;
-            (a as any).falling = true;
+            a.falling = true;
           } else if (result.killed || !targetHit.target.alive) {
             this.remove(i);
             continue;
@@ -130,7 +131,7 @@ export class ProjectileSystem {
         this.orient(a);
         if (a.life <= 0 || a.pos.y < -10) this.remove(i);
       } else {
-        if ((a as any).falling) {
+        if (a.falling) {
           a.vel.y -= this.gravity * 2 * dt;
           a.pos.addScaledVector(a.vel, dt);
           a.mesh.position.copy(a.pos);

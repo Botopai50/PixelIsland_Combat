@@ -65,8 +65,19 @@ export class TouchControls {
         }
         navigator.vibrate?.(8);
       });
+      // arrastar a partir de Atacar/Defender também mira (dá para puxar o arco e mirar com o mesmo dedo)
+      let last: { x: number; y: number } | null = null;
+      if (b.action === 'attack' || b.action === 'guard') {
+        e.addEventListener('pointerdown', (ev) => (last = { x: ev.clientX, y: ev.clientY }));
+        e.addEventListener('pointermove', (ev) => {
+          if (!last) return;
+          input.addLook((ev.clientX - last.x) * this.lookSensitivity * 0.8, (ev.clientY - last.y) * this.lookSensitivity * 0.8);
+          last = { x: ev.clientX, y: ev.clientY };
+        });
+      }
       const up = (ev: PointerEvent) => {
         ev.preventDefault();
+        last = null;
         if (b.toggle) return;
         input.setButton(b.action, false);
         e.classList.remove('on');
@@ -76,7 +87,7 @@ export class TouchControls {
       wrap.appendChild(e);
     }
     const top = r.querySelector('.t-top')!;
-    const topBtns: [Action, string][] = [['view', '1ª/3ª'], ['shoulder', 'Ombro'], ['inventory', 'Itens'], ['spawn', '+Inimigo'], ['reset', 'Resetar'], ['tweak', 'Ajustes'], ['help', '?']];
+    const topBtns: [Action, string][] = [['view', '1ª/3ª'], ['shoulder', 'Ombro'], ['inventory', 'Itens'], ['spawn', '+Inimigo'], ['reset', 'Resetar'], ['juice', 'Juice'], ['tweak', 'Ajustes'], ['help', '?']];
     for (const [a, label] of topBtns) {
       const e = document.createElement('button');
       e.className = 't-small';

@@ -196,7 +196,7 @@ export class HumanoidRig {
     this.flashT -= dt;
     const k = Math.max(0, this.flashT) > 0 ? 1 : 0;
     for (const m of this.materials) {
-      m.emissive.copy(this.flashColor).multiplyScalar(k * 0.9);
+      m.emissive.copy(this.flashColor).multiplyScalar(k * 0.6);
     }
   }
 

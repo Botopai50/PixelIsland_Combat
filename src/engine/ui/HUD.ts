@@ -96,7 +96,7 @@ export class HUD implements ScreenFX {
     this.tintEl = el('div', 'screen-tint', root);
     this.modeLabel = el('div', 'mode-label', root);
     this.statsEl = el('div', 'dummy-stats', root);
-    el('div', 'keyhints', root, '<kbd>G</kbd> inimigo · <kbd>R</kbd> restaurar · <kbd>V</kbd> 1ª/3ª · <kbd>T</kbd> ombro<br><kbd>Q</kbd> lock-on · <kbd>I</kbd> inventário · <kbd>P</kbd> ajustes · <kbd>H</kbd> ajuda');
+    el('div', 'keyhints', root, '<kbd>G</kbd> inimigo · <kbd>R</kbd> restaurar · <kbd>V</kbd> 1ª/3ª · <kbd>T</kbd> ombro<br><kbd>Q</kbd> lock-on · <kbd>I</kbd> inventário · <kbd>P</kbd> ajustes · <kbd>B</kbd> juice · <kbd>H</kbd> ajuda');
 
     inventory.events.on('changed', () => this.renderHotbar());
     inventory.events.on('hotbar', () => this.renderHotbar());

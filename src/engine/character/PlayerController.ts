@@ -38,6 +38,8 @@ interface AttackRun {
   hitAny: boolean;
   charged: boolean;
   wallHit: boolean;
+  flurry?: boolean;
+  missed?: boolean;
 }
 
 type Buffered = { kind: 'attack' | 'dodge'; t: number } | null;
@@ -409,11 +411,13 @@ export class PlayerController implements Damageable {
 
   private startAttack(def: AttackDef, charged = false) {
     const w = this.weapon!;
-    if (def.stamina && this.stamina < def.stamina) {
+    const cost = charged ? this.ctx.tuning.chargeCost : (def.stamina ?? 0);
+    if (cost > 0 && this.stamina < cost) {
       this.ctx.sound.play('exhausted', { pos: this.position });
+      this.ctx.events.emit('toast', { text: 'Stamina insuficiente', kind: 'warn' });
       return false;
     }
-    if (def.stamina) this.useStamina(def.stamina);
+    if (cost > 0) this.useStamina(cost);
     this.pickFacingForAttack();
     const T = this.ctx.tuning;
     this.attack = {
@@ -447,7 +451,7 @@ export class PlayerController implements Damageable {
   private nextFlurrySwing() {
     const def = ATTACKS[this.flurryHits % 2 === 0 ? 'flurryA' : 'flurryB'];
     this.startAttack(def);
-    if (this.attack) (this.attack as AttackRun & { flurry?: boolean }).flurry = true;
+    if (this.attack) this.attack.flurry = true;
     // avança até o alvo
     if (this.lockTarget || this.flurryHits === 0) {
       const t = this.lockTarget ?? this.ctx.combat.findLockTarget(this.position, yawToDir(this.facing, this.tmp2), 6, 100, 'player');
@@ -482,7 +486,8 @@ export class PlayerController implements Damageable {
 
   // ------------------------------------------------------------------ esquiva
   private canDodge() {
-    return this.time >= this.dodgeReadyAt && !this.exhausted && this.stamina >= this.ctx.tuning.dodgeCost * 0.5;
+    const onGround = this.motor.grounded || this.motor.timeSinceGrounded < this.ctx.tuning.coyoteTime;
+    return onGround && this.time >= this.dodgeReadyAt && !this.exhausted && this.stamina >= this.ctx.tuning.dodgeCost * 0.5;
   }
 
   private startDodge() {
@@ -594,7 +599,11 @@ export class PlayerController implements Damageable {
     const inp = ctx.input;
     this.time += dt;
     this.stateT += dt;
-    if (dt <= 0) return;
+    if (dt <= 0) {
+      // hit stop / pausa: o tempo congela, mas comandos não podem se perder
+      this.captureFrozenInput();
+      return;
+    }
 
     // ---------------------------------------------- morte / respawn
     if (this.state === 'dead') {
@@ -717,7 +726,7 @@ export class PlayerController implements Damageable {
         const a = this.attack!;
         const tm = a.timing;
         const tRec = this.stateT - tm.windup - tm.active;
-        const flurry = (a as AttackRun & { flurry?: boolean }).flurry;
+        const flurry = a.flurry;
         // cancelamento com defesa/esquiva nas janelas configuradas
         if ((dodgePressed || this.buffered?.kind === 'dodge') && this.canCancelAttack() && this.canDodge() && !flurry) {
           this.buffered = null;
@@ -747,16 +756,11 @@ export class PlayerController implements Damageable {
           break;
         }
         // próximo golpe do combo (buffer)
-        if (this.buffered?.kind === 'attack' && tRec >= a.def.chainAt && a.def.next && !a.charged) {
+        // (com troca de item pendente o golpe termina a recuperação inteira antes de trocar)
+        if (this.buffered?.kind === 'attack' && tRec >= a.def.chainAt && a.def.next && !a.charged && !this.pendingEquip) {
           this.buffered = null;
           this.comboResetAt = this.time + 0.5;
-          if (this.pendingEquip) {
-            this.attack = null;
-            this.setState('move');
-            this.tryStartEquip();
-          } else {
-            this.startComboAttack();
-          }
+          this.startComboAttack();
           break;
         }
         if (this.stateT >= tm.total) {
@@ -878,6 +882,21 @@ export class PlayerController implements Damageable {
 
     this.guardAmount = damp(this.guardAmount, this.guarding || this.state === 'guardHit' ? 1 : 0, 22, dt);
     this.buildAnim(dt);
+  }
+
+  /** Durante o congelamento (hit stop), guarda os comandos para o próximo frame válido. */
+  private captureFrozenInput() {
+    const inp = this.ctx.input;
+    const T = this.ctx.tuning;
+    if (inp.consume('attack')) {
+      this.attackPressAt = this.time;
+      this.attackHeld = true;
+      this.buffered = { kind: 'attack', t: this.time };
+    }
+    if (!inp.isHeld('attack')) this.attackHeld = false;
+    if (inp.consume('dodge')) this.buffered = { kind: 'dodge', t: this.time };
+    if (inp.wasPressed('guard')) this.guardPressAt = this.time;
+    if (inp.wasPressed('jump')) this.jumpBufferedUntil = this.time + T.jumpBuffer;
   }
 
   private inChainWindow() {
@@ -1089,8 +1108,8 @@ export class PlayerController implements Damageable {
     const t1 = Math.min(t, tm.windup + tm.active);
     a.prevT = t;
     if (t1 <= t0 || a.wallHit) {
-      if (t > tm.windup + tm.active && !a.hitAny && !(a as AttackRun & { missed?: boolean }).missed) {
-        (a as AttackRun & { missed?: boolean }).missed = true;
+      if (t > tm.windup + tm.active && !a.hitAny && !a.missed) {
+        a.missed = true;
         this.ctx.events.emit('miss', { pos: this.position.clone(), intensity: a.def.strength });
       }
       return;
@@ -1112,10 +1131,11 @@ export class PlayerController implements Damageable {
           strength: a.def.strength, knockback: a.def.knockback,
           point: h.point, dir: this.edge.clone(), normal: h.normal, hurtbox: h.hurtbox,
           projectile: false, charged: a.charged, origin: this.position.clone(),
+          unblockable: !!a.flurry,
         };
         const result = h.target.receiveHit(hit);
         this.ctx.events.emit('hit', { hit, result, target: h.target, source: 'player' });
-        if ((a as AttackRun & { flurry?: boolean }).flurry) this.ctx.events.emit('flurryHit', { pos: h.point });
+        if (a.flurry) this.ctx.events.emit('flurryHit', { pos: h.point });
         if (result.deflected) {
           this.bounce();
           return;

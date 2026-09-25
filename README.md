@@ -48,6 +48,7 @@ itch.io, Netlify…).
 | G | Gerar inimigo |
 | R | Restaurar arena (sem reiniciar) |
 | P | Painel de ajustes |
+| B | Comparar: juice ligado/desligado (atalho) |
 | H | Ajuda |
 
 ### Toque (celular)
@@ -55,11 +56,11 @@ itch.io, Netlify…).
 |---|---|
 | Metade esquerda | Analógico dinâmico (pouca inclinação = andar) |
 | Metade direita | Arrastar para olhar/mirar |
-| Atacar | Toque = golpe · segurar = carga · arco: segurar e soltar |
+| Atacar | Toque = golpe · segurar = carga · arco: segurar e soltar (arraste o próprio botão para mirar) |
 | Defender | Segurar = bloquear · no tempo certo = aparo |
 | Pular / Esquiva / Correr / Travar | Ações de movimento e lock-on |
 | Barra rápida | Toque para equipar (toque longo abre o inventário) |
-| Botões do topo | 1ª/3ª, ombro, itens, +inimigo, resetar, ajustes, ajuda |
+| Botões do topo | 1ª/3ª, ombro, itens, +inimigo, resetar, juice on/off, ajustes, ajuda |
 
 A interface alterna sozinha entre modo toque e mouse conforme o dispositivo usado.
 

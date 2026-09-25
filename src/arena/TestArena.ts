@@ -184,7 +184,8 @@ export class TestArena {
     const sun = new THREE.DirectionalLight(0xfff0d6, 2.6);
     sun.position.set(-14, 24, 10);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    const mobile = matchMedia('(pointer: coarse)').matches;
+    sun.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048);
     const s = sun.shadow.camera;
     s.left = -30; s.right = 30; s.top = 30; s.bottom = -30; s.near = 1; s.far = 80;
     sun.shadow.bias = -0.0004;

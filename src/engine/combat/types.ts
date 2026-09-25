@@ -33,6 +33,8 @@ export interface HitInfo {
   charged: boolean;
   /** Origem do atacante (para testes de direção de bloqueio). */
   origin: THREE.Vector3;
+  /** Ignora escudos (ex.: rajada após esquiva perfeita). */
+  unblockable?: boolean;
 }
 
 export interface HitResult {
