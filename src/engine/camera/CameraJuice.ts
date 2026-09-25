@@ -85,10 +85,13 @@ export class CameraJuice {
     });
     ev.on('mantlePull', (e) => {
       // tranco para cima: cabeça dá um solavanco e a câmera "puxa"
-      this.pitch.impulse((1.2 + 1.3 * e.intensity) * k());
-      this.roll.impulse((Math.random() < 0.5 ? -1 : 1) * 0.5 * k());
-      this.fovS.impulse(-14 * k());
-      this.dollyS.impulse(-0.8 * k() * third());
+      // mesma força em 1ª e 3ª pessoa (a 3ª é atenuada a 40% no update → compensa)
+      const full = 1 / (0.4 + 0.6 * this.blend);
+      this.pitch.impulse((1.2 + 1.3 * e.intensity) * k() * full);
+      this.roll.impulse((Math.random() < 0.5 ? -1 : 1) * 0.5 * k() * full);
+      this.fovS.impulse(-14 * k() * full);
+      // 3ª pessoa: câmera dá um "puxão" junto (aproxima e sobe com atraso)
+      this.dollyS.impulse(-2.2 * k() * third());
       if (ctx.tuning.shakeEnabled) ctx.shake.add(0.12 + 0.1 * e.intensity);
       ctx.sound.play('jump', { pos: e.pos, vol: 0.55 });
     });
