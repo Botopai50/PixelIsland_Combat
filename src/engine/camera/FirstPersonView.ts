@@ -5,7 +5,7 @@ import { createWeaponModel, BOW_DRAW_LEN, type WeaponModel } from '../items/Weap
 import { ATTACKS, TWO_HAND_GRIP } from '../combat/Attacks';
 import { viewmodelStyle, viewmodelSwingPose } from './ViewmodelSwings';
 import { SlashTrail } from '../vfx/Trail';
-import { Spring, Spring3, clamp01, damp, easeOutBack, lerp } from '../core/math';
+import { Spring, Spring3, clamp, clamp01, damp, easeOutBack, lerp } from '../core/math';
 import { weaponBasis } from '../character/PlayerView';
 import type { ItemId } from '../items/Items';
 import { HERO_STYLE } from '../character/HumanoidRig';
@@ -36,6 +36,8 @@ export class FirstPersonView {
   private attackW = 0;
   /** Escudo recolhe para baixo durante o golpe: o arco da lâmina fica legível. */
   private shieldTuck = 0;
+  /** Tela estreita (celular em pé): armas menores e mais perto do centro. */
+  private vmScale = 1;
   private equipScale = 1;
   private lastMain: ItemId | null = null;
   private lastYaw = 0;
@@ -98,11 +100,12 @@ export class FirstPersonView {
   }
 
   /** Posiciona o antebraço: mão em `hand`, cotovelo deslocado para trás/baixo. */
-  private placeArm(arm: THREE.Group, hand: THREE.Vector3, side: 1 | -1) {
-    const elbow = this.v2.set(hand.x + 0.12 * side, hand.y - 0.2, hand.z + 0.3);
+  private placeArm(arm: THREE.Group, hand: THREE.Vector3, side: 1 | -1, elbowAt?: THREE.Vector3) {
+    const elbow = elbowAt ? this.v2.copy(elbowAt) : this.v2.set(hand.x + 0.12 * side, hand.y - 0.2, hand.z + 0.3);
     arm.position.copy(hand);
     // lookAt usa coordenadas de mundo; aqui estamos no espaço da câmera
     arm.quaternion.setFromUnitVectors(Z_AXIS, elbow.sub(hand).normalize());
+    arm.scale.setScalar(this.vmScale);
     arm.visible = true;
   }
 
@@ -150,6 +153,8 @@ export class FirstPersonView {
     );
 
     // equip: abaixa e levanta
+    const aspectK = clamp(camera.aspect / 1.78, 0.55, 1);
+    this.vmScale = aspectK;
     const main = p.mainHand;
     if (main !== this.lastMain) {
       this.equipScale = 0;
@@ -170,7 +175,7 @@ export class FirstPersonView {
     const def = p.state === 'attack' && p.attack ? p.attack.def : p.state === 'charge' && p.weapon?.charged ? ATTACKS[p.weapon.charged] : null;
     this.attackW = def ? 1 : damp(this.attackW, 0, 14, dt);
     if (model && main !== 'bow') {
-      model.root.scale.set(1, T.rangeMul, 1);
+      model.root.scale.set(aspectK, T.rangeMul * aspectK, aspectK);
       // pose de descanso (espaço da câmera)
       this.restPos.set(0.27, -0.3, -0.42).add(offset);
       const restDir = this.dir.set(-0.12, 0.75, -0.6).normalize();
@@ -207,6 +212,13 @@ export class FirstPersonView {
         model.root.quaternion.copy(this.restQ);
         model.root.rotateX(-this.kick.value * 0.1);
         const g = p.guardAmount;
+        if (main === 'sword' && g > 0.01) {
+          // defendendo: espada abaixada ao lado, fora do caminho do escudo
+          const gp = this.v2.set(0.36, -0.4, -0.42).add(offset);
+          const gq = weaponBasis(this.dir.set(0.35, 0.45, -0.82).normalize(), this.edge.set(-0.6, 0.3, -0.3).normalize(), new THREE.Quaternion());
+          model.root.position.lerp(gp, g);
+          model.root.quaternion.slerp(gq, g);
+        }
         if ((main === 'axe' || main === 'pickaxe') && g > 0.01) {
           // defesa com ferramenta: cabo atravessado na frente da câmera
           const gp = this.v2.set(0.24, -0.2, -0.42).add(offset);
@@ -216,11 +228,13 @@ export class FirstPersonView {
           model.root.quaternion.slerp(gq, g);
         }
       }
+      // tela estreita (celular em pé): aproxima tudo do centro horizontalmente
+      model.root.position.x *= aspectK;
       this.placeArm(this.armR, model.root.position, 1);
       const work = (def ?? (this.attackW > 0.01 ? p.attack?.def : null))?.work;
       if (work || main === 'axe' || main === 'pickaxe') {
         // pegada de duas mãos no cabo
-        const g = this.v2.set(0, TWO_HAND_GRIP, 0).applyQuaternion(model.root.quaternion).add(model.root.position);
+        const g = this.v2.set(0, TWO_HAND_GRIP * aspectK, 0).applyQuaternion(model.root.quaternion).add(model.root.position);
         this.placeArm(this.armL, g.clone(), -1);
       }
       const charge = p.state === 'charge' ? clamp01(p.chargeT / T.chargeTime) : 0;
@@ -255,21 +269,31 @@ export class FirstPersonView {
       const tuckTo = p.state === 'attack' ? 1 : 0;
       this.shieldTuck += (tuckTo - this.shieldTuck) * (1 - Math.exp(-dt * (tuckTo ? 18 : 7)));
       const tk = this.shieldTuck * (1 - g);
-      const pos = this.v2.set(lerp(-0.36, -0.13, g), lerp(-0.42, -0.2, g), lerp(-0.4, -0.46, g)).add(offset);
+      // descanso: baixo à esquerda, quase de perfil | defesa: à esquerda da mira,
+      // de frente, longe o bastante para não tapar a tela (a mira fica livre)
+      const pos = this.v2.set(lerp(-0.36, -0.21, g), lerp(-0.38, -0.17, g), lerp(-0.48, -0.6, g)).add(offset);
       pos.z += this.shieldKick.value * 0.05;
       pos.y -= lower * 0.5 + tk * 0.2;
       pos.x -= tk * 0.1;
+      pos.x *= aspectK;
       sh.root.position.copy(pos);
-      sh.root.quaternion.setFromEuler(new THREE.Euler(lerp(0.1, -0.08, g) - this.shieldKick.value * 0.1, Math.PI + lerp(-1.1, -0.15, g), lerp(0.2, 0.05, g)));
+      sh.root.scale.setScalar(0.8 * aspectK);
+      sh.root.quaternion.setFromEuler(new THREE.Euler(lerp(0.12, -0.04, g) - this.shieldKick.value * 0.1, Math.PI + lerp(-0.95, -0.3, g), lerp(0.18, 0.06, g)));
       sh.setGlow(p.state === 'guardHit' ? 0.3 : 0);
-      if (!this.armL.visible) this.placeArm(this.armL, this.hand.copy(pos).add(new THREE.Vector3(0.02, -0.03, 0.06)), -1);
+      if (!this.armL.visible) {
+        // mão fechada na alça, antebraço preso nas tiras por trás do escudo
+        sh.root.updateMatrix();
+        const grip = this.hand.set(0, -0.02, -0.05).applyMatrix4(sh.root.matrix);
+        const elbow = this.dir.set(0.3, -0.1, -0.1).applyMatrix4(sh.root.matrix);
+        this.placeArm(this.armL, grip, -1, elbow);
+      }
     }
 
     // ------------------------------------------------ rastro (espaço da câmera)
     const a = p.attack;
     if (model && a && p.state === 'attack' && main !== 'bow' && (p.swingPhase === 'active' || (p.swingPhase === 'recovery' && p.stateT - a.timing.windup - a.timing.active < Math.max(0.04, (viewmodelStyle(a.def.id).follow ?? 0) * a.timing.recovery * 0.8)))) {
-      const base = this.v.set(0, a.weapon.bladeStart * T.rangeMul, 0).applyQuaternion(model.root.quaternion).add(model.root.position);
-      const tip = this.v2.set(0, a.weapon.bladeEnd * T.rangeMul, 0).applyQuaternion(model.root.quaternion).add(model.root.position);
+      const base = this.v.set(0, a.weapon.bladeStart * T.rangeMul * this.vmScale, 0).applyQuaternion(model.root.quaternion).add(model.root.position);
+      const tip = this.v2.set(0, a.weapon.bladeEnd * T.rangeMul * this.vmScale, 0).applyQuaternion(model.root.quaternion).add(model.root.position);
       this.trail.color.set(a.charged ? 0x9fe8ff : a.weapon.trailColor);
       this.trail.push(base, tip);
     }
