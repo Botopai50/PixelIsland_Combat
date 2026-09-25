@@ -3,6 +3,7 @@ import type { GameContext } from '../core/Context';
 import { HumanoidRig, HERO_STYLE, ARM_UPPER, ARM_FORE } from './HumanoidRig';
 import { HumanoidAnimator } from './HumanoidAnimator';
 import { solveTwoBoneIK } from './IK';
+import { FootIK } from './FootIK';
 import type { PlayerController } from './PlayerController';
 import { createWeaponModel, BOW_DRAW_LEN, type WeaponModel } from '../items/WeaponModels';
 import { ATTACKS, TWO_HAND_GRIP, pivotFor, swingDirLocal } from '../combat/Attacks';
@@ -37,6 +38,7 @@ export class PlayerView {
   readonly rig = new HumanoidRig(HERO_STYLE);
   readonly animator: HumanoidAnimator;
   readonly trail = new SlashTrail(26);
+  private footIK: FootIK;
   private models = new Map<ItemId, WeaponModel>();
   private shield: WeaponModel;
   private lastMain: ItemId | null = null;
@@ -57,6 +59,7 @@ export class PlayerView {
 
   constructor(private ctx: GameContext, private player: PlayerController) {
     this.animator = new HumanoidAnimator(this.rig);
+    this.footIK = new FootIK(ctx.physics);
     this.animator.onFootstep = (_foot, intensity) => {
       const p = player.position;
       ctx.events.emit('footstep', { pos: p.clone(), surface: player.motor.surface, intensity, player: true });
@@ -134,6 +137,10 @@ export class PlayerView {
     p.anim.ready = !sheathed && (p.mainHand === 'sword' || p.mainHand === 'axe' || p.mainHand === 'pickaxe') ? 1 : 0;
     p.anim.hasShieldUp = p.hasShield;
     this.animator.update(dt, p.anim);
+    // pés se ajustam ao chão (degraus, bordas, rampas) quando apoiado
+    const feetOnGround = p.motor.grounded && p.state !== 'dodge' && p.state !== 'dead' && !(p.state === 'attack' && p.attack?.def.spin);
+    const spd = Math.hypot(p.motor.velocity.x, p.motor.velocity.z);
+    this.footIK.update(dt, rig, feetOnGround, spd < 0.4 ? 0.8 : 0.1);
     rig.root.updateMatrixWorld(true);
 
 

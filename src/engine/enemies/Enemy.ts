@@ -4,6 +4,7 @@ import { CharacterMotor } from '../physics/CharacterMotor';
 import { HumanoidRig, GOBLIN_STYLE, ARM_UPPER, ARM_FORE } from '../character/HumanoidRig';
 import { HumanoidAnimator, defaultAnimInput, type AnimInput } from '../character/HumanoidAnimator';
 import { solveTwoBoneIK } from '../character/IK';
+import { FootIK } from '../character/FootIK';
 import { weaponBasis } from '../character/PlayerView';
 import { createWeaponModel, type WeaponModel } from '../items/WeaponModels';
 import {
@@ -48,6 +49,7 @@ export class Enemy implements Damageable, Threat {
   private club: WeaponModel;
   private shieldModel: WeaponModel | null = null;
   readonly trail = new SlashTrail(18);
+  private footIK: FootIK;
   shielded: boolean;
   facing = 0;
   hp: number;
@@ -97,6 +99,7 @@ export class Enemy implements Damageable, Threat {
     }
     this.rig = new HumanoidRig(style);
     this.animator = new HumanoidAnimator(this.rig);
+    this.footIK = new FootIK(ctx.physics);
     this.animator.onFootstep = (_f, intensity) => {
       ctx.events.emit('footstep', { pos: this.motor.position.clone(), surface: this.motor.surface, intensity: intensity * 0.6, player: false });
     };
@@ -508,6 +511,7 @@ export class Enemy implements Damageable, Threat {
       a.hurtX = this.hurtDir.x * f.z - this.hurtDir.z * f.x;
     }
     this.animator.update(dt, a);
+    this.footIK.update(dt, rig, m.grounded && this.state !== 'dead' && this.state !== 'spawn' && this.state !== 'stagger', Math.hypot(v.x, v.z) < 0.4 ? 0.8 : 0.1);
     rig.updateFlash(dt);
     this.weaponSpring.update(dt);
     this.shieldSpring.update(dt);

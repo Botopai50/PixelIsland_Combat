@@ -129,7 +129,7 @@ src/
     core/                 Tuning, GameClock (hit stop/câmera lenta), Input (ações), Events, Context, math
     physics/              PhysicsWorld (caixas/rampas, raycast), CharacterMotor (degraus, rampas, aterrissagem)
     character/            PlayerController (lógica), PlayerView (3ª pessoa), HumanoidRig (modelo),
-                          HumanoidAnimator (animação procedural), IK (dois ossos)
+                          HumanoidAnimator (animação procedural), IK (dois ossos), FootIK (pés no chão)
     camera/               CameraRig (1ª/3ª, colisão, ombro, lock-on), FirstPersonView (braços/armas)
     combat/               Attacks (golpes e trajetórias), CombatWorld (hurtboxes/consultas),
                           Projectiles (flechas), FeedbackDirector ("juice"), types (Damageable, eficácia)
