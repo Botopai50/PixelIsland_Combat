@@ -68,6 +68,7 @@ export class HumanoidAnimator {
   private lean = 0;
   private wasGrounded = true;
   private airVy = 0;
+  private squash = 1;
   /** Mola de recuo (usada ao bater/bloquear): empurra tronco e braços. */
   recoil = 0;
   private recoilV = 0;
@@ -106,12 +107,12 @@ export class HumanoidAnimator {
       }
       hipYaw = clamp(a, -1.1, 1.1);
     }
-    const stride = lerp(1.2, 2.1, run) * (s.sprinting ? 1.12 : 1);
+    const stride = lerp(1.25, 2.4, run) * (s.sprinting ? 1.12 : 1);
     if (s.grounded) this.phase += (dirSign * speed * dt) / stride;
     const ph = this.phase * TAU;
     const sn = Math.sin(ph), cs = Math.cos(ph);
-    const amp = lerp(0.38, 0.62, run) * moving;
-    const k1 = lerp(0.45, 0.95, run) * moving;
+    const amp = lerp(0.5, 1.05, run) * moving;
+    const k1 = lerp(0.6, 1.75, run) * moving;
 
     P.thighR.x = -sn * amp;
     P.thighL.x = sn * amp;
@@ -119,19 +120,19 @@ export class HumanoidAnimator {
     P.shinL.x = 0.08 + Math.max(0, -cs) * k1 + (1 - moving) * 0.04;
     P.footR.x = -(P.thighR.x + P.shinR.x) * 0.6;
     P.footL.x = -(P.thighL.x + P.shinL.x) * 0.6;
-    P.pelvis.y = hipYaw + sn * 0.08 * moving;
+    P.pelvis.y = hipYaw + sn * lerp(0.12, 0.22, run) * moving;
     P.spine.y = -hipYaw * 0.55;
-    P.chest.y = -hipYaw * 0.35 - sn * 0.09 * moving;
-    P.spine.x = run * 0.12 + (s.sprinting ? 0.06 : 0) + (s.exhausted ? 0.25 : 0);
+    P.chest.y = -hipYaw * 0.35 - sn * lerp(0.16, 0.3, run) * moving;
+    P.spine.x = run * 0.32 + (s.sprinting ? 0.18 : 0) + (s.exhausted ? 0.25 : 0);
     P.head.x = -P.spine.x * 0.6;
-    const armAmp = lerp(0.3, 0.55, run) * moving;
+    const armAmp = lerp(0.45, 1.15, run) * moving;
     P.upperArmR.x = sn * armAmp;
     P.upperArmL.x = -sn * armAmp;
-    P.upperArmR.z = -0.1 - run * 0.05;
-    P.upperArmL.z = 0.1 + run * 0.05;
-    P.forearmR.x = -lerp(0.2, 0.95, run * moving) - 0.1;
-    P.forearmL.x = -lerp(0.2, 0.95, run * moving) - 0.1;
-    let bob = Math.abs(cs) * lerp(0.02, 0.035, run) * moving;
+    P.upperArmR.z = -0.1 - run * 0.18;
+    P.upperArmL.z = 0.1 + run * 0.18;
+    P.forearmR.x = -lerp(0.25, 1.55, run * moving) - 0.1;
+    P.forearmL.x = -lerp(0.25, 1.55, run * moving) - 0.1;
+    let bob = Math.abs(cs) * lerp(0.035, 0.1, run) * moving;
 
     // parado: respiração e peso
     const idle = 1 - moving;
@@ -159,17 +160,18 @@ export class HumanoidAnimator {
     if (!s.grounded) {
       const up = clamp01(s.vy / 6);
       const down = clamp01(-s.vy / 10);
-      P.thighR.x = lerp(-0.15, -0.5, up) + down * 0.2;
-      P.shinR.x = lerp(0.3, 0.75, up) - down * 0.15;
-      P.thighL.x = lerp(0.05, 0.15, up) - down * 0.1;
-      P.shinL.x = lerp(0.25, 0.35, up) + down * 0.1;
-      P.upperArmR.z = -0.2 - down * 0.2;
-      P.upperArmL.z = 0.2 + down * 0.2;
-      P.upperArmR.x = -0.15;
-      P.upperArmL.x = -0.15;
-      P.forearmR.x = -0.4;
-      P.forearmL.x = -0.4;
-      P.spine.x = 0.06 - down * 0.06;
+      P.thighR.x = lerp(-0.35, -1.35, up) + down * 0.5;
+      P.shinR.x = lerp(0.6, 1.9, up) - down * 0.4;
+      P.thighL.x = lerp(0.2, 0.55, up) - down * 0.35;
+      P.shinL.x = lerp(0.4, 0.9, up) + down * 0.3;
+      P.upperArmR.z = -0.55 - up * 0.3 - down * 0.8;
+      P.upperArmL.z = 0.55 + up * 0.3 + down * 0.8;
+      P.upperArmR.x = -0.6 * up + 0.2 * down;
+      P.upperArmL.x = -0.3 * up - 0.3 * down;
+      P.forearmR.x = -0.9;
+      P.forearmL.x = -0.9;
+      P.spine.x = 0.2 * up - down * 0.3;
+      P.head.x = -0.15 * up + down * 0.2;
       bob = 0;
     }
     // aterrissagem proporcional à velocidade de queda
@@ -180,10 +182,11 @@ export class HumanoidAnimator {
     // aterrissagem: agacha proporcional ao impacto
     this.landImpact = damp(this.landImpact, 0, 7, dt);
     const li = this.landImpact;
-    P.thighR.x -= li * 0.45; P.thighL.x -= li * 0.45;
-    P.shinR.x += li * 0.8; P.shinL.x += li * 0.8;
+    P.thighR.x -= li * 0.95; P.thighL.x -= li * 0.95;
+    P.shinR.x += li * 1.6; P.shinL.x += li * 1.6;
     P.footR.x -= li * 0.5; P.footL.x -= li * 0.5;
-    P.spine.x += li * 0.2;
+    P.spine.x += li * 0.5;
+    P.upperArmR.z -= li * 0.5; P.upperArmL.z += li * 0.5;
 
     // agachamento genérico (defesa, carga)
     const cr = s.crouch;
@@ -233,17 +236,19 @@ export class HumanoidAnimator {
           // salto curto para frente: joelhos recolhidos, braços para trás
           const k = Math.sin(u * Math.PI);
           P.spine.x = 0.25 * k;
-          P.thighR.x = P.thighL.x = -0.6 * k;
-          P.shinR.x = P.shinL.x = 0.9 * k;
-          P.upperArmR.x = P.upperArmL.x = 0.5 * k;
-          bodyYOffset = 0.06 * k;
+          P.thighR.x = P.thighL.x = -1.1 * k;
+          P.shinR.x = P.shinL.x = 1.6 * k;
+          P.upperArmR.x = P.upperArmL.x = 0.9 * k;
+          bodyYOffset = 0.12 * k;
         } else if (s.dodgeType === 'flip') {
           targetBodyRotX = -e * TAU;
           const tuck = Math.sin(u * Math.PI);
-          P.thighR.x = P.thighL.x = -1.4 * tuck;
-          P.shinR.x = P.shinL.x = 1.8 * tuck;
-          P.upperArmR.z = -1.2 * tuck; P.upperArmL.z = 1.2 * tuck;
-          bodyYOffset = 0.2 * tuck;
+          P.thighR.x = P.thighL.x = -1.9 * tuck;
+          P.shinR.x = P.shinL.x = 2.3 * tuck;
+          P.spine.x = 0.5 * tuck;
+          P.head.x = 0.4 * tuck;
+          P.upperArmR.z = -1.5 * tuck; P.upperArmL.z = 1.5 * tuck;
+          bodyYOffset = 0.3 * tuck;
         } else if (s.dodgeType === 'back') {
           const k = Math.sin(u * Math.PI);
           P.spine.x = -0.35 * k;
@@ -255,14 +260,14 @@ export class HumanoidAnimator {
           // salto lateral (BotW): corpo inclina para o lado do salto, pernas juntas recolhidas
           const side = s.dodgeType === 'hopL' ? 1 : -1;
           const k = Math.sin(u * Math.PI);
-          targetBodyRotZ = -side * 0.28 * k;
-          P.spine.z = side * 0.12 * k;
-          P.thighR.x = P.thighL.x = -0.45 * k;
-          P.shinR.x = P.shinL.x = 0.85 * k;
+          targetBodyRotZ = -side * 0.55 * k;
+          P.spine.z = side * 0.25 * k;
+          P.thighR.x = P.thighL.x = -0.9 * k;
+          P.shinR.x = P.shinL.x = 1.5 * k;
           P.thighR.z = side * 0.18 * k; P.thighL.z = side * 0.18 * k;
-          P.upperArmR.z = -0.35 * k; P.upperArmL.z = 0.35 * k;
-          P.upperArmR.x = P.upperArmL.x = -0.25 * k;
-          bodyYOffset = 0.05 * k;
+          P.upperArmR.z = -0.9 * k; P.upperArmL.z = 0.9 * k;
+          P.upperArmR.x = P.upperArmL.x = -0.4 * k;
+          bodyYOffset = 0.12 * k;
         }
         break;
       }
@@ -348,7 +353,7 @@ export class HumanoidAnimator {
     P.upperArmR.x -= this.recoil * 0.6;
 
     // inclinação nas curvas (estilo corrida de aventura)
-    this.lean = damp(this.lean, clamp(-s.turnRate * 0.04 * clamp01(speed / 4), -0.18, 0.18), 8, dt);
+    this.lean = damp(this.lean, clamp(-s.turnRate * 0.1 * clamp01(speed / 4), -0.5, 0.5), 8, dt);
     targetBodyRotZ += s.grounded && s.action === 'none' ? this.lean : 0;
 
     // ---------------------------------------------------------------- aplica com suavização
@@ -367,6 +372,11 @@ export class HumanoidAnimator {
     this.bodyY = damp(this.bodyY, bodyYOffset, 20, dt);
     const b = this.rig.body;
     b.rotation.set(this.bodyRotX, this.bodyYaw, this.bodyRotZ, 'YXZ');
-    b.position.y = this.rig.bodyPivotY + this.bodyY - li * 0.09 - cr * 0.12 + bob;
+    // estica no ar (subindo rápido) e achata na aterrissagem
+    const stretch = s.grounded ? 0 : clamp(Math.abs(s.vy) * 0.012, 0, 0.1);
+    const sy = 1 + stretch - li * 0.16;
+    this.squash = damp(this.squash, sy, 25, dt);
+    b.scale.set(1 / Math.sqrt(this.squash), this.squash, 1 / Math.sqrt(this.squash));
+    b.position.y = this.rig.bodyPivotY + this.bodyY - li * 0.2 - cr * 0.12 + bob;
   }
 }

@@ -524,8 +524,8 @@ export class PlayerController implements Damageable {
     this.iFramesUntil = this.time + T.dodgeIFrameEnd * durMul;
     this.iFramesFrom = this.time + T.dodgeIFrameStart;
     this.useStamina(T.dodgeCost);
-    if (type === 'flip') this.motor.velocity.y = 5.2;
-    if (type === 'hopL' || type === 'hopR' || type === 'back' || type === 'hopF') this.motor.velocity.y = 3.2;
+    if (type === 'flip') this.motor.velocity.y = 6.4;
+    if (type === 'hopL' || type === 'hopR' || type === 'back' || type === 'hopF') this.motor.velocity.y = 4.2;
     this.ctx.events.emit('dodge', { pos: this.position.clone() });
     // esquiva perfeita: algum inimigo prestes a acertar?
     for (const th of this.ctx.threats()) {
