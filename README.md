@@ -24,6 +24,11 @@ npm run preview    # serve o build (http://localhost:4173)
 Para testar no celular: rode `npm run dev` e abra, no celular (mesma rede Wi-Fi), o endereço
 "Network" que o Vite mostra no terminal. Use o aparelho na horizontal; o botão de início pede tela cheia.
 
+**Online (GitHub Pages):** https://botopai50.github.io/PixelIsland_Combat/
+
+- Com Pages em *GitHub Actions*: o workflow `.github/workflows/pages.yml` faz build e publica a cada push.
+- Com Pages em *branch → /docs*: rode `npm run build:docs` e faça commit da pasta `docs/`.
+
 O `dist/` é estático (caminhos relativos): pode ser publicado em qualquer hospedagem (GitHub Pages,
 itch.io, Netlify…).
 
