@@ -34,9 +34,14 @@ export class FootIK {
   update(dt: number, rig: HumanoidRig, enabled: boolean, flatten = 0.5) {
     this.flat = flatten;
     if (dt <= 0) return;
-    this.w = damp(this.w, enabled ? 1 : 0, 12, dt);
+    // desliga NA HORA ao sair do chão (senão o pé é puxado para baixo/trás no salto);
+    // liga de volta suavemente depois de apoiar
+    this.w = enabled ? damp(this.w, 1, 10, dt) : 0;
     if (this.w < 0.01) {
-      this.offL = this.offR = this.pelvis = 0;
+      // sem IK de pernas; o quadril volta suave (sem "pulo" visual ao sair de uma borda)
+      this.offL = this.offR = 0;
+      this.pelvis = damp(this.pelvis, 0, 20, dt);
+      rig.body.position.y += this.pelvis;
       return;
     }
     const root = rig.root;

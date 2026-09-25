@@ -291,8 +291,9 @@ export class HumanoidAnimator {
       const down = clamp01(-s.vy / 10);
       P.thighR.x = lerp(-0.35, -1.35, up) + down * 0.5;
       P.shinR.x = lerp(0.6, 1.9, up) - down * 0.4;
-      P.thighL.x = lerp(0.2, 0.55, up) - down * 0.35;
-      P.shinL.x = lerp(0.4, 0.9, up) + down * 0.3;
+      // perna de trás: recolhida sob o corpo (o pé não fica "largado" para trás)
+      P.thighL.x = lerp(0.0, 0.12, up) - down * 0.3;
+      P.shinL.x = lerp(0.35, 0.55, up) + down * 0.15;
       P.upperArmR.z = -0.55 - up * 0.3 - down * 0.8;
       P.upperArmL.z = 0.55 + up * 0.3 + down * 0.8;
       P.upperArmR.x = -0.6 * up + 0.2 * down;
