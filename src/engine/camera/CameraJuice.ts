@@ -138,11 +138,13 @@ export class CameraJuice {
     const y = p.position.y;
     if (!Number.isFinite(this.followY) || Math.abs(this.followY - y) > 3) this.followY = y;
     this.followY = damp(this.followY, y, p.motor.grounded ? 14 : 5, dt);
-    this.lift = (this.followY - y) * 0.6 * k * third;
+    this.lift = (this.followY - y) * 0.35 * k * third;
 
     // escalas: picos ~2–5° de rotação, ~1,5–4° de FOV, ~0,2–0,4 m de distância
-    this.rot.set(this.pitch.value * 2.5, this.yaw.value * 2.5, this.roll.value * 2.5 + this.leanRoll);
-    this.fov = this.fovS.value * 1.5 - this.chargeW * 6 * k;
-    this.dolly = (this.dollyS.value * 6 - this.chargeW * 0.6 * k + this.sprintW * 0.35 * k) * third;
+    // 3ª pessoa bem mais sutil (a câmera está longe; tudo parece maior)
+    const m = 0.4 + 0.6 * this.blend;
+    this.rot.set(this.pitch.value * 2.5 * m, this.yaw.value * 2.5 * m, (this.roll.value * 2.5 + this.leanRoll) * m);
+    this.fov = (this.fovS.value * 1.5 - this.chargeW * 6 * k) * m;
+    this.dolly = (this.dollyS.value * 6 - this.chargeW * 0.6 * k + this.sprintW * 0.35 * k) * third * 0.45;
   }
 }

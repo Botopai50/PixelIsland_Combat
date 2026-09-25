@@ -34,6 +34,7 @@ export class CameraRig implements AimSource {
   private lockFlickCd = 0;
   private leanSm = new THREE.Vector3();
   private juice: CameraJuice;
+  private runSway = 0;
   private tmp2 = new THREE.Vector3();
   private dir = new THREE.Vector3();
   private raycaster = new THREE.Raycaster();
@@ -212,7 +213,15 @@ export class CameraRig implements AimSource {
       lean.multiplyScalar(T.fpSwingLean * b);
     }
     this.leanSm.lerp(lean, 1 - Math.exp(-realDt * 30));
-    cam.rotation.set(this.pitch + sh.rot.x + this.leanSm.x + J.rot.x, this.yaw + Math.PI + sh.rot.y + this.leanSm.y + J.rot.y, sh.rot.z + roll + this.leanSm.z + J.rot.z, 'YXZ');
+    // 1ª pessoa correndo: a câmera balança (rola de um lado a outro a cada
+    // passada e acena a cada pisada); andando, só um resto disso
+    this.runSway = damp(this.runSway, b > 0.5 && p.motor.grounded ? (p.sprinting ? 1 : clamp01(speed / 6) * 0.3) : 0, 6, realDt);
+    const sw = this.runSway * (T.camBob ? T.camBobAmount : 0);
+    const ph = this.bobPhase * Math.PI * 2;
+    const swRoll = Math.sin(ph) * 0.028 * sw;
+    const swPitch = (Math.abs(Math.cos(ph)) - 0.64) * 0.03 * sw;
+    const swYaw = Math.sin(ph) * 0.008 * sw;
+    cam.rotation.set(this.pitch + sh.rot.x + this.leanSm.x + J.rot.x + swPitch, this.yaw + Math.PI + sh.rot.y + this.leanSm.y + J.rot.y + swYaw, sh.rot.z + roll + this.leanSm.z + J.rot.z + swRoll, 'YXZ');
     cam.updateMatrixWorld();
     // deslocamento do tremor em espaço de câmera
     this.tmp.set(sh.offset.x, sh.offset.y, 0).applyQuaternion(cam.quaternion);
