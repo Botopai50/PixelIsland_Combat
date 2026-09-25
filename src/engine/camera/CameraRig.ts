@@ -210,7 +210,8 @@ export class CameraRig implements AimSource {
     eye.y += vis + Math.abs(Math.sin(this.bobPhase * Math.PI * 2)) * 0.018 * bobAmt + this.landDip.value * 0.05;
     eye.addScaledVector(right, Math.sin(this.bobPhase * Math.PI * 2) * 0.008 * bobAmt);
     // escalando: olho um pouco afastado da parede (vê as mãos e a parede subindo)
-    if (p.state === 'climb' || p.state === 'mantle') eye.addScaledVector(p.climbN, 0.24);
+    if (p.state === 'climb') eye.addScaledVector(p.climbN, 0.24);
+    else if (p.state === 'mantle') eye.addScaledVector(p.climbN, 0.24 * (1 - clamp01(p.anim.actionU / 0.6)));
     if (p.state === 'dodge') eye.y -= Math.sin(clamp01(p.stateT / 0.35) * Math.PI) * (p.dodgeType === 'flip' ? 0.25 : 0.12);
     if (p.state === 'dead') eye.y -= clamp01(p.stateT) * 1.2;
 
@@ -264,7 +265,9 @@ export class CameraRig implements AimSource {
     const climbRoll = p.state === 'climb' ? Math.sin(p.climbPhase * Math.PI * 2) * p.climbMove * 0.035 * b : 0;
     // 1ª pessoa subindo a beirada: a cabeça olha para a borda/mãos e depois volta
     const mantlePitch = p.state === 'mantle' ? -0.5 * Math.sin(clamp01(p.anim.actionU / 0.85) * Math.PI) * b : 0;
-    cam.rotation.set(this.pitch + sh.rot.x + this.leanSm.x + J.rot.x + swPitch + mantlePitch, this.yaw + Math.PI + sh.rot.y + this.leanSm.y + J.rot.y + swYaw, sh.rot.z + roll + this.leanSm.z + J.rot.z + swRoll + climbRoll, 'YXZ');
+    // soma de todos os efeitos nunca passa da vertical (senão a câmera vira e olha para trás)
+    const finalPitch = clamp(this.pitch + sh.rot.x + this.leanSm.x + J.rot.x + swPitch + mantlePitch, -1.5, 1.5);
+    cam.rotation.set(finalPitch, this.yaw + Math.PI + sh.rot.y + this.leanSm.y + J.rot.y + swYaw, sh.rot.z + roll + this.leanSm.z + J.rot.z + swRoll + climbRoll, 'YXZ');
     cam.updateMatrixWorld();
     // deslocamento do tremor em espaço de câmera
     this.tmp.set(sh.offset.x, sh.offset.y, 0).applyQuaternion(cam.quaternion);

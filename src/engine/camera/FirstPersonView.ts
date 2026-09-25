@@ -362,37 +362,43 @@ export class FirstPersonView {
     const mv = p.climbMove;
     const jp = p.anim.climbJump ?? 0;
     const launch = Math.max(0, jp), gather = Math.max(0, -jp);
+    if (mantle) {
+      // subida em 1ª pessoa animada no ESPAÇO DA CÂMERA (como nos FPS): as mãos
+      // entram por baixo, agarram a borda à frente, empurram para baixo enquanto
+      // a câmera sobe e saem por baixo — nunca ficam "para trás" do corpo
+      const grab = Math.min(1, u / 0.14);
+      const pullK = Math.min(1, Math.max(0, (u - 0.12) / 0.5));
+      const pressK = Math.min(1, Math.max(0, (u - 0.6) / 0.3));
+      for (const side of [1, -1] as const) {
+        const t = this.cw.set(
+          side * (0.19 + 0.04 * pressK),
+          -0.62 + 0.5 * grab - 0.25 * pullK - 0.35 * pressK,
+          -0.46 + 0.04 * pullK + 0.1 * pressK,
+        );
+        t.y -= (1 - k) * 0.6;
+        const e = this.ce.set(t.x + side * 0.12, t.y - 0.34, t.z + 0.3);
+        this.placeArm(side === 1 ? this.armR : this.armL, t.clone(), side, e);
+      }
+      return;
+    }
     for (const side of [1, -1] as const) {
       const t = this.cw;
-      if (mantle) {
-        // em cima da borda; quando o corpo passa por cima as mãos vêm junto
-        // (empurrando o chão ao lado do corpo) e no fim saem por baixo
-        t.set(w.x + rx * 0.2 * side - n.x * 0.2, w.y + 0.03, w.z + rz * 0.2 * side - n.z * 0.2);
-        const follow = Math.min(1, Math.max(0, (u - 0.45) / 0.3));
-        if (follow > 0) {
-          const fx = -n.x, fz = -n.z;
-          t.x += (p.position.x + fx * 0.32 + rx * 0.2 * side - t.x) * follow;
-          t.z += (p.position.z + fz * 0.32 + rz * 0.2 * side - t.z) * follow;
-        }
-        t.y -= Math.max(0, (u - 0.75) / 0.25) * 0.6;
-      } else {
-        const a = Math.sin(cp) * mv * side; // + = esta mão alta
-        const rising = Math.max(0, Math.cos(cp) * side) * mv; // esta mão subindo: desgruda
-        t.set(
-          p.position.x + rx * 0.19 * side, p.position.y + 1.82 + 0.22 * a + 0.3 * launch - 0.12 * gather,
-          p.position.z + rz * 0.19 * side,
-        );
-        // plano da parede (palma encostada), a mão que sobe afasta um pouco
-        const d = (t.x - w.x) * n.x + (t.z - w.z) * n.z;
-        const off = 0.04 + 0.1 * rising;
-        t.x -= n.x * (d - off);
-        t.z -= n.z * (d - off);
-        // passou do topo: agarra a borda por cima
-        if (t.y > w.y - 0.02) {
-          t.y = w.y + 0.02;
-          t.x -= n.x * 0.1;
-          t.z -= n.z * 0.1;
-        }
+      const a = Math.sin(cp) * mv * side; // + = esta mão alta
+      const rising = Math.max(0, Math.cos(cp) * side) * mv; // esta mão subindo: desgruda
+      t.set(
+        p.position.x + rx * 0.19 * side, p.position.y + 1.82 + 0.22 * a + 0.3 * launch - 0.12 * gather,
+        p.position.z + rz * 0.19 * side,
+      );
+      // plano da parede (palma encostada), a mão que sobe afasta um pouco
+      const d = (t.x - w.x) * n.x + (t.z - w.z) * n.z;
+      const off = 0.04 + 0.1 * rising;
+      t.x -= n.x * (d - off);
+      t.z -= n.z * (d - off);
+      // passou do topo: agarra a borda por cima
+      if (t.y > w.y - 0.02) {
+        t.y = w.y + 0.02;
+        t.x -= n.x * 0.1;
+        t.z -= n.z * 0.1;
       }
       // cotovelo calculado no MUNDO a partir de um ombro de verdade (fica certo
       // olhando para cima, para frente ou para baixo)
