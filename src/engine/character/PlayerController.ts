@@ -534,7 +534,7 @@ export class PlayerController implements Damageable {
     if (!hasInput || inp.moveY < -0.5) {
       type = 'back';
       dirYaw = refYaw + Math.PI;
-      durMul = 0.85;
+      durMul = 1.35; // cobre o tempo no ar (~0,46 s) até a aterrissagem
     } else if (Math.abs(inp.moveX) >= Math.abs(inp.moveY) * 0.8) {
       type = inp.moveX < 0 ? 'hopL' : 'hopR';
       dirYaw = refYaw + (inp.moveX < 0 ? Math.PI / 2 : -Math.PI / 2);
@@ -552,7 +552,7 @@ export class PlayerController implements Damageable {
     this.iFramesUntil = this.time + T.dodgeIFrameEnd * durMul;
     this.iFramesFrom = this.time + T.dodgeIFrameStart;
     this.useStamina(T.dodgeCost);
-    if (type === 'back') this.motor.velocity.y = 4.8;
+    if (type === 'back') this.motor.velocity.y = 6.6;
     else if (type === 'hopL' || type === 'hopR' || type === 'hopF') this.motor.velocity.y = 4.2;
     this.ctx.events.emit('dodge', { pos: this.position.clone() });
     // esquiva perfeita: algum inimigo prestes a acertar?
@@ -1041,7 +1041,7 @@ export class PlayerController implements Damageable {
         steer = false;
         faceMode = 'none';
         const u = clamp01(this.stateT / this.dodgeDur);
-        const dist = T.dodgeDistance * (this.dodgeType === 'back' ? 0.8 : this.dodgeType === 'flip' ? 0.9 : this.dodgeType === 'hopF' ? 0.75 : 1);
+        const dist = T.dodgeDistance * (this.dodgeType === 'back' ? 1.15 : this.dodgeType === 'flip' ? 0.9 : this.dodgeType === 'hopF' ? 0.75 : 1);
         const sp = (dist / this.dodgeDur) * (1.4 - 0.8 * u);
         v.x = this.dodgeDir.x * sp;
         v.z = this.dodgeDir.z * sp;

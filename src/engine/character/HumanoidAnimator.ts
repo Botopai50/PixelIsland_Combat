@@ -515,22 +515,27 @@ export class HumanoidAnimator {
           P.upperArmR.z = -1.5 * tuck; P.upperArmL.z = 1.5 * tuck;
           bodyYOffset = 0.3 * tuck;
         } else if (s.dodgeType === 'back') {
-          // pulo para trás (BotW): impulso inclinando para trás, pernas recolhidas
-          // à frente no ar, braços à frente para equilibrar, aterrissa agachado
+          // pulo para trás EXAGERADO: agacha e explode para trás arqueando o
+          // corpo, braços jogados para cima/à frente, joelhos no peito no alto,
+          // e aterrissa agachado fundo
           const k = Math.sin(u * Math.PI);
-          const push = Math.sin(clamp01(u / 0.35) * Math.PI) * (u < 0.35 ? 1 : 0);
-          const land = clamp01((u - 0.75) / 0.25);
-          P.spine.x = -0.3 * k + 0.15 * push + 0.25 * land;
-          P.chest.x = -0.1 * k;
-          P.head.x = 0.2 * k;
-          P.thighR.x = -0.75 * k; P.shinR.x = 1.0 * k + 0.3 * land;
-          P.thighL.x = -0.45 * k; P.shinL.x = 0.8 * k + 0.3 * land;
-          P.footR.x = P.footL.x = 0.25 * k;
-          P.upperArmR.x = P.upperArmL.x = -0.75 * k;
-          P.upperArmR.z = -0.35 * k; P.upperArmL.z = 0.35 * k;
-          P.forearmR.x = P.forearmL.x = -0.4 * k;
-          targetBodyRotX = -0.18 * k;
-          bodyYOffset = 0.1 * k - 0.1 * land;
+          const push = u < 0.3 ? Math.sin((u / 0.3) * Math.PI) : 0;
+          const tuck = Math.sin(clamp01((u - 0.2) / 0.6) * Math.PI);
+          const land = clamp01((u - 0.78) / 0.22);
+          const arch = Math.sin(clamp01(u / 0.55) * Math.PI);
+          P.spine.x = -0.55 * arch + 0.35 * tuck * (u > 0.45 ? 1 : 0.3) + 0.4 * land;
+          P.chest.x = -0.25 * arch;
+          P.head.x = 0.35 * arch - 0.1 * land;
+          P.thighR.x = -1.35 * tuck + 0.2 * push; P.shinR.x = 1.7 * tuck + 0.5 * land;
+          P.thighL.x = -1.1 * tuck + 0.3 * push; P.shinL.x = 1.5 * tuck + 0.5 * land;
+          P.thighR.x -= 0.5 * land; P.thighL.x -= 0.5 * land;
+          P.footR.x = P.footL.x = 0.35 * tuck;
+          // braços: lançados para cima/à frente no impulso, abertos no ar
+          P.upperArmR.x = P.upperArmL.x = -1.1 * arch - 0.5 * tuck;
+          P.upperArmR.z = -0.55 * k; P.upperArmL.z = 0.55 * k;
+          P.forearmR.x = P.forearmL.x = -0.3 * k;
+          targetBodyRotX = -0.55 * arch + 0.25 * land;
+          bodyYOffset = 0.22 * tuck - 0.25 * land - 0.12 * push;
         } else {
           // salto lateral (BotW): corpo inclina para o lado do salto, pernas juntas recolhidas
           const side = s.dodgeType === 'hopL' ? 1 : -1;
