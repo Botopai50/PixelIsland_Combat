@@ -646,7 +646,11 @@ export class HumanoidAnimator {
     else this.bodyRotX = damp(this.bodyRotX, targetBodyRotX, snappy ? 25 : 12, dt);
     this.bodyRotZ = damp(this.bodyRotZ, targetBodyRotZ, 12, dt);
     if (s.action === 'attack' && Math.abs(targetBodyYaw) > 0.01) this.bodyYaw = targetBodyYaw;
-    else this.bodyYaw = damp(this.bodyYaw, targetBodyYaw, 10, dt);
+    else {
+      // depois de um giro o corpo pode estar em 2π: equivale a 0, nunca "desgira"
+      this.bodyYaw = Math.atan2(Math.sin(this.bodyYaw), Math.cos(this.bodyYaw));
+      this.bodyYaw = damp(this.bodyYaw, targetBodyYaw, 10, dt);
+    }
     this.bodyY = damp(this.bodyY, bodyYOffset, 20, dt);
     const b = this.rig.body;
     b.rotation.set(this.bodyRotX, this.bodyYaw, this.bodyRotZ, 'YXZ');
