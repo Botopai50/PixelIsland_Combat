@@ -109,6 +109,7 @@ export class TweakPanel {
     cam.add(t, 'camBob').name('Balanço da cabeça');
     cam.add(t, 'camBobAmount', 0, 3, 0.05).name('Balanço ×');
     cam.add(t, 'fpSwingLean', 0, 2, 0.05).name('Câmera no golpe (1ª p.) ×');
+    cam.add(t, 'camJuice', 0, 2, 0.05).name('Câmera nas ações ×');
     cam.add(t, 'weaponSway').name('Balanço da arma (1ª)');
     cam.add(t, 'weaponSwayAmount', 0, 3, 0.05).name('Balanço da arma ×');
     cam.add(t, 'fovKick').name('FOV dinâmico');

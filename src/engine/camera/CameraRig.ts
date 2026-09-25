@@ -5,6 +5,7 @@ import { clamp, clamp01, damp, dampAngle, dirToYaw, lerp, easeInOutSine, Spring 
 import { EYE } from './FirstPersonView';
 import { viewmodelCamLean, viewmodelStyle } from './ViewmodelSwings';
 import { ATTACKS } from '../combat/Attacks';
+import { CameraJuice } from './CameraJuice';
 
 /**
  * Câmera de 1ª e 3ª pessoa com transição suave (mesma mira, mesmo yaw/pitch),
@@ -32,6 +33,7 @@ export class CameraRig implements AimSource {
   private lockFlick = 0;
   private lockFlickCd = 0;
   private leanSm = new THREE.Vector3();
+  private juice: CameraJuice;
   private tmp2 = new THREE.Vector3();
   private dir = new THREE.Vector3();
   private raycaster = new THREE.Raycaster();
@@ -42,6 +44,7 @@ export class CameraRig implements AimSource {
   constructor(private ctx: GameContext) {
     this.camera = new THREE.PerspectiveCamera(ctx.tuning.fov, 1, 0.05, 400);
     this.camera.rotation.order = 'YXZ';
+    this.juice = new CameraJuice(ctx, () => this.player);
     ctx.events.on('land', (e) => {
       if (e.player && this.ctx.tuning.camBob) this.landDip.impulse(-0.6 - e.intensity * 3);
     });
@@ -136,6 +139,9 @@ export class CameraRig implements AimSource {
     this.blend = clamp01(this.blend + Math.sign(target - this.blend) * realDt / 0.22);
     if (Math.abs(target - this.blend) < 0.01) this.blend = target;
     const b = easeInOutSine(this.blend);
+    this.juice.blend = b;
+    this.juice.update(realDt);
+    const J = this.juice;
     this.shoulderBlend = damp(this.shoulderBlend, this.shoulderSide, 8, realDt);
     const aiming = p.state === 'bow' ? 1 : 0;
     this.aimBlend = damp(this.aimBlend, aiming, 9, realDt);
@@ -146,7 +152,7 @@ export class CameraRig implements AimSource {
     const right = this.tmp.set(-Math.cos(this.yaw), 0, Math.sin(this.yaw));
     const vis = p.motor.visualStepOffset;
     this.pivot.copy(p.position);
-    this.pivot.y += T.camHeight + vis + this.landDip.value * 0.03;
+    this.pivot.y += T.camHeight + vis + this.landDip.value * 0.03 + J.lift;
     const shoulder = lerp(T.camShoulder, Math.max(T.camShoulder, 0.55) * 1.45, this.aimBlend) * this.shoulderBlend;
     const wantDist = lerp(T.camDistance, 2.5, this.aimBlend) * (p.lockTarget ? 1.08 : 1);
     // colisão: primeiro para o lado (ombro), depois para trás
@@ -165,7 +171,7 @@ export class CameraRig implements AimSource {
     }
     // encolhe instantâneo, estica devagar (evita "estalos")
     this.dist = allowed < this.dist ? allowed : damp(this.dist, allowed, 4, realDt);
-    const thirdPos = new THREE.Vector3().copy(shoulderPos).addScaledVector(back, this.dist);
+    const thirdPos = new THREE.Vector3().copy(shoulderPos).addScaledVector(back, clamp(this.dist + J.dolly, 0.35, Math.max(0.35, allowed)));
     const g = this.ctx.physics.groundHeight(thirdPos.x, thirdPos.z, thirdPos.y, 0, 0);
     if (Number.isFinite(g.y)) thirdPos.y = Math.max(thirdPos.y, g.y + 0.2);
 
@@ -191,7 +197,7 @@ export class CameraRig implements AimSource {
       if (p.state === 'attack' && p.attack?.def.spin) kick += 4;
     }
     this.fovKick = damp(this.fovKick, kick, 6, realDt);
-    cam.fov = T.fov + this.fovKick - this.aimBlend * (b > 0.5 ? 18 : 12) * (0.5 + 0.5 * p.bowDraw);
+    cam.fov = T.fov + this.fovKick + J.fov - this.aimBlend * (b > 0.5 ? 18 : 12) * (0.5 + 0.5 * p.bowDraw);
     cam.updateProjectionMatrix();
 
     // ------------------------------------------------ orientação + tremor
@@ -206,7 +212,7 @@ export class CameraRig implements AimSource {
       lean.multiplyScalar(T.fpSwingLean * b);
     }
     this.leanSm.lerp(lean, 1 - Math.exp(-realDt * 30));
-    cam.rotation.set(this.pitch + sh.rot.x + this.leanSm.x, this.yaw + Math.PI + sh.rot.y + this.leanSm.y, sh.rot.z + roll + this.leanSm.z, 'YXZ');
+    cam.rotation.set(this.pitch + sh.rot.x + this.leanSm.x + J.rot.x, this.yaw + Math.PI + sh.rot.y + this.leanSm.y + J.rot.y, sh.rot.z + roll + this.leanSm.z + J.rot.z, 'YXZ');
     cam.updateMatrixWorld();
     // deslocamento do tremor em espaço de câmera
     this.tmp.set(sh.offset.x, sh.offset.y, 0).applyQuaternion(cam.quaternion);

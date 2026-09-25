@@ -70,6 +70,8 @@ export interface Tuning {
   camBobAmount: number;
   /** 1ª pessoa: a câmera inclina/gira junto com o golpe. */
   fpSwingLean: number;
+  /** Movimento de câmera por ações (molas de rotação/FOV/distância). */
+  camJuice: number;
   weaponSway: boolean;
   weaponSwayAmount: number;
   fovKick: boolean;
@@ -146,6 +148,7 @@ export function defaultTuning(): Tuning {
     camBob: true,
     camBobAmount: 1,
     fpSwingLean: 1,
+    camJuice: 1,
     weaponSway: true,
     weaponSwayAmount: 1,
     fovKick: true,
@@ -172,6 +175,7 @@ export function rawPreset(t: Tuning): Partial<Tuning> {
     screenFx: false,
     camBob: false,
     fpSwingLean: 0,
+    camJuice: 0,
     weaponSway: false,
     fovKick: false,
     knockbackMul: t.knockbackMul,
