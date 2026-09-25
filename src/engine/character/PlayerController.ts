@@ -103,7 +103,7 @@ export class PlayerController implements Damageable {
 
   // esquiva
   dodgeDir = new THREE.Vector3();
-  dodgeType: DodgeType = 'roll';
+  dodgeType: DodgeType = 'hopL';
   private dodgeDur = 0.35;
   private dodgeReadyAt = 0;
   private iFramesUntil = -1;
@@ -496,33 +496,27 @@ export class PlayerController implements Damageable {
     const hasInput = Math.hypot(inp.moveX, inp.moveY) > 0.25;
     this.cancelActions();
     this.guarding = false;
-    let type: DodgeType = 'roll';
-    let dirYaw = this.facing;
-    let durMul = 1;
-    if (this.lockTarget || this.aim.firstPerson || this.guardHeldInput()) {
-      // travado/defendendo: saltos laterais e mortal para trás (estilo Zelda)
-      const refYaw = this.lockTarget ? this.facing : this.aim.yaw;
-      if (!hasInput || inp.moveY < -0.5) {
-        type = this.aim.firstPerson ? 'back' : 'flip';
-        dirYaw = refYaw + Math.PI;
-        durMul = type === 'flip' ? 1.15 : 0.8;
-      } else if (Math.abs(inp.moveX) > Math.abs(inp.moveY)) {
-        type = inp.moveX < 0 ? 'hopL' : 'hopR';
-        dirYaw = refYaw + (inp.moveX < 0 ? Math.PI / 2 : -Math.PI / 2);
-        durMul = 0.85;
-      } else {
-        type = 'roll';
-        dirYaw = this.inputYaw();
-      }
-    } else if (hasInput) {
-      type = 'roll';
-      dirYaw = this.inputYaw();
-      this.facing = dirYaw;
+    // Esquiva estilo BotW: sem rolamento. Saltos laterais para os lados,
+    // mortal para trás (sem direção ou para trás) e um salto curto para frente.
+    // Referência: o alvo travado ou, sem lock, a direção da câmera.
+    const refYaw = this.lockTarget ? this.facing : this.aim.yaw;
+    let type: DodgeType;
+    let dirYaw: number;
+    let durMul: number;
+    if (!hasInput || inp.moveY < -0.5) {
+      type = this.aim.firstPerson ? 'back' : 'flip';
+      dirYaw = refYaw + Math.PI;
+      durMul = type === 'flip' ? 1.1 : 0.8;
+    } else if (Math.abs(inp.moveX) >= Math.abs(inp.moveY) * 0.8) {
+      type = inp.moveX < 0 ? 'hopL' : 'hopR';
+      dirYaw = refYaw + (inp.moveX < 0 ? Math.PI / 2 : -Math.PI / 2);
+      durMul = 0.85;
     } else {
-      type = 'back';
-      dirYaw = this.facing + Math.PI;
-      durMul = 0.75;
+      type = 'hopF';
+      dirYaw = refYaw;
+      durMul = 0.8;
     }
+    if (!this.lockTarget) this.facing = refYaw;
     this.dodgeType = type;
     yawToDir(dirYaw, this.dodgeDir);
     this.dodgeDur = T.dodgeDuration * durMul;
@@ -531,7 +525,7 @@ export class PlayerController implements Damageable {
     this.iFramesFrom = this.time + T.dodgeIFrameStart;
     this.useStamina(T.dodgeCost);
     if (type === 'flip') this.motor.velocity.y = 5.2;
-    if (type === 'hopL' || type === 'hopR' || type === 'back') this.motor.velocity.y = 2.6;
+    if (type === 'hopL' || type === 'hopR' || type === 'back' || type === 'hopF') this.motor.velocity.y = 3.2;
     this.ctx.events.emit('dodge', { pos: this.position.clone() });
     // esquiva perfeita: algum inimigo prestes a acertar?
     for (const th of this.ctx.threats()) {
@@ -540,10 +534,6 @@ export class PlayerController implements Damageable {
         break;
       }
     }
-  }
-
-  private guardHeldInput() {
-    return this.ctx.input.isHeld('guard');
   }
 
   // ------------------------------------------------------------------ arco
@@ -876,7 +866,7 @@ export class PlayerController implements Damageable {
 
     // hurtbox (cápsula do corpo)
     const p = this.position;
-    const crouch = this.state === 'dodge' && this.dodgeType === 'roll' ? 0.6 : 1;
+    const crouch = this.state === 'dodge' && this.dodgeType === 'flip' ? 0.75 : 1;
     this.hurtboxes[0].a.set(p.x, p.y + 0.35, p.z);
     this.hurtboxes[0].b.set(p.x, p.y + 1.45 * crouch, p.z);
 
@@ -993,11 +983,10 @@ export class PlayerController implements Damageable {
         steer = false;
         faceMode = 'none';
         const u = clamp01(this.stateT / this.dodgeDur);
-        const dist = T.dodgeDistance * (this.dodgeType === 'back' ? 0.6 : this.dodgeType === 'flip' ? 0.9 : 1);
+        const dist = T.dodgeDistance * (this.dodgeType === 'back' ? 0.6 : this.dodgeType === 'flip' ? 0.9 : this.dodgeType === 'hopF' ? 0.75 : 1);
         const sp = (dist / this.dodgeDur) * (1.4 - 0.8 * u);
         v.x = this.dodgeDir.x * sp;
         v.z = this.dodgeDir.z * sp;
-        if (this.dodgeType === 'roll') this.facing = dampAngle(this.facing, dirToYaw(this.dodgeDir.x, this.dodgeDir.z), 30, dt);
         break;
       }
       case 'hurt':

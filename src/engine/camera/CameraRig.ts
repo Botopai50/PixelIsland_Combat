@@ -147,7 +147,7 @@ export class CameraRig implements AimSource {
     const eye = new THREE.Vector3(0, EYE.y, EYE.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), p.facing).add(p.position);
     eye.y += vis + Math.abs(Math.sin(this.bobPhase * Math.PI * 2)) * 0.045 * bobAmt + this.landDip.value * 0.05;
     eye.addScaledVector(right, Math.sin(this.bobPhase * Math.PI * 2) * 0.02 * bobAmt);
-    if (p.state === 'dodge') eye.y -= Math.sin(clamp01(p.stateT / 0.35) * Math.PI) * (p.dodgeType === 'roll' ? 0.45 : 0.15);
+    if (p.state === 'dodge') eye.y -= Math.sin(clamp01(p.stateT / 0.35) * Math.PI) * (p.dodgeType === 'flip' ? 0.25 : 0.12);
     if (p.state === 'dead') eye.y -= clamp01(p.stateT) * 1.2;
 
     this.landDip.update(Math.max(realDt, 1 / 240));
