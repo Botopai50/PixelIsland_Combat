@@ -1,0 +1,22 @@
+{
+  "name": "pixelisland-combat",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Protótipo 3D (Three.js) de movimentação e combate 'juicy' inspirado em Zelda: Breath of the Wild",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lil-gui": "^0.21.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "typescript": "5.9",
+    "vite": "^8.3.1"
+  }
+}
