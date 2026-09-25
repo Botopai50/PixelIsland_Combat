@@ -1159,6 +1159,7 @@ export class PlayerController implements Damageable {
     const v = this.motor.velocity;
     s.speed = Math.hypot(v.x, v.z);
     s.runSpeed = this.ctx.tuning.runSpeed;
+    s.walkSpeed = this.ctx.tuning.walkSpeed;
     s.moveAngle = s.speed > 0.2 ? angleDelta(this.facing, dirToYaw(v.x, v.z)) : 0;
     s.grounded = this.motor.grounded;
     s.vy = v.y;

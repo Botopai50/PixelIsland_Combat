@@ -1,6 +1,6 @@
 /** Telas de início e ajuda (textos dos controles). */
 export const CONTROLS_DESKTOP: [string, string][] = [
-  ['W A S D', 'Mover (Z alterna andar)'],
+  ['W A S D', 'Mover (Z / Caps Lock: andar ↔ correr)'],
   ['Shift', 'Disparada (gasta stamina)'],
   ['Espaço', 'Pular (segure = mais alto)'],
   ['Botão esq. / J', 'Atacar · segure = ataque carregado · arco: puxar/soltar'],

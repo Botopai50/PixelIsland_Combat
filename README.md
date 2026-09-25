@@ -39,7 +39,7 @@ itch.io, Netlify…).
 ### Teclado e mouse
 | Tecla | Ação |
 |---|---|
-| W A S D | Mover (Z alterna andar/correr) |
+| W A S D | Mover — correr por padrão · **Z** ou **Caps Lock** alterna para ANDAR (animação própria) |
 | Shift | Disparada (gasta stamina) |
 | Espaço | Pular — segurar = salto mais alto |
 | Botão esquerdo / J | Atacar · **segurar** = ataque carregado · com arco: puxar e soltar |

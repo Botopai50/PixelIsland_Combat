@@ -20,6 +20,7 @@ export type DodgeType = 'hopL' | 'hopR' | 'hopF' | 'back' | 'flip';
 export interface AnimInput {
   speed: number;
   runSpeed: number;
+  walkSpeed?: number;
   /** Direção do movimento relativa à frente do personagem (rad). */
   moveAngle: number;
   grounded: boolean;
@@ -92,7 +93,11 @@ export class HumanoidAnimator {
     const P = this.pose;
     for (const j of JOINTS) P[j].set(0, 0, 0);
     const speed = s.speed;
-    const run = clamp01((speed - 2) / Math.max(0.1, s.runSpeed - 2));
+    // peso da corrida: 0 até a velocidade de andar, 1 perto da de correr (transição curta)
+    const walkTop = (s.walkSpeed ?? 2.2) * 1.15;
+    const runStart = Math.max(walkTop + 0.3, s.runSpeed * 0.7);
+    const rr = clamp01((speed - walkTop) / (runStart - walkTop));
+    const run = rr * rr * (3 - 2 * rr);
     const moving = clamp01(speed / 1.2);
 
     // ---------------------------------------------------------------- locomoção
@@ -107,32 +112,47 @@ export class HumanoidAnimator {
       }
       hipYaw = clamp(a, -1.1, 1.1);
     }
-    const stride = lerp(1.25, 2.4, run) * (s.sprinting ? 1.12 : 1);
+    // dois ciclos distintos, misturados pelo peso `run`:
+    //  ANDAR  — postura ereta, sempre um pé no chão, braços soltos quase esticados,
+    //           quadril balança de lado, corpo desce no apoio duplo.
+    //  CORRER — tronco inclinado, fase de voo (corpo sobe), joelhos altos,
+    //           cotovelos a 90°, braços bombeando, quique forte.
+    const stride = lerp(1.35, 2.4, run) * (s.sprinting ? 1.12 : 1);
     if (s.grounded) this.phase += (dirSign * speed * dt) / stride;
     const ph = this.phase * TAU;
     const sn = Math.sin(ph), cs = Math.cos(ph);
-    const amp = lerp(0.5, 1.05, run) * moving;
-    const k1 = lerp(0.6, 1.75, run) * moving;
+    const W = (1 - run) * moving, R = run * moving;
 
-    P.thighR.x = -sn * amp;
-    P.thighL.x = sn * amp;
-    P.shinR.x = 0.08 + Math.max(0, cs) * k1 + (1 - moving) * 0.04;
-    P.shinL.x = 0.08 + Math.max(0, -cs) * k1 + (1 - moving) * 0.04;
-    P.footR.x = -(P.thighR.x + P.shinR.x) * 0.6;
-    P.footL.x = -(P.thighL.x + P.shinL.x) * 0.6;
-    P.pelvis.y = hipYaw + sn * lerp(0.12, 0.22, run) * moving;
+    // --- pernas
+    const thighAmpW = 0.42, thighAmpR = 1.05;
+    P.thighR.x = -sn * (thighAmpW * W + thighAmpR * R) - 0.18 * R;
+    P.thighL.x = sn * (thighAmpW * W + thighAmpR * R) - 0.18 * R;
+    // andar: joelho dobra pouco e só na perna que avança; correr: calcanhar sobe até o glúteo
+    const swingR = Math.max(0, cs), swingL = Math.max(0, -cs);
+    P.shinR.x = 0.06 + swingR * (0.55 * W + 1.9 * R) + 0.25 * R + (1 - moving) * 0.04;
+    P.shinL.x = 0.06 + swingL * (0.55 * W + 1.9 * R) + 0.25 * R + (1 - moving) * 0.04;
+    P.footR.x = -(P.thighR.x + P.shinR.x) * 0.6 + swingR * 0.2 * W;
+    P.footL.x = -(P.thighL.x + P.shinL.x) * 0.6 + swingL * 0.2 * W;
+
+    // --- quadril e tronco
+    P.pelvis.y = hipYaw + sn * (0.1 * W + 0.22 * R);
+    P.pelvis.z = sn * 0.07 * W; // balanço lateral do quadril ao andar
     P.spine.y = -hipYaw * 0.55;
-    P.chest.y = -hipYaw * 0.35 - sn * lerp(0.16, 0.3, run) * moving;
-    P.spine.x = run * 0.32 + (s.sprinting ? 0.18 : 0) + (s.exhausted ? 0.25 : 0);
-    P.head.x = -P.spine.x * 0.6;
-    const armAmp = lerp(0.45, 1.15, run) * moving;
-    P.upperArmR.x = sn * armAmp;
-    P.upperArmL.x = -sn * armAmp;
-    P.upperArmR.z = -0.1 - run * 0.18;
-    P.upperArmL.z = 0.1 + run * 0.18;
-    P.forearmR.x = -lerp(0.25, 1.55, run * moving) - 0.1;
-    P.forearmL.x = -lerp(0.25, 1.55, run * moving) - 0.1;
-    let bob = Math.abs(cs) * lerp(0.035, 0.1, run) * moving;
+    P.chest.y = -hipYaw * 0.35 - sn * (0.1 * W + 0.3 * R);
+    P.spine.z = -sn * 0.04 * W;
+    P.spine.x = 0.02 * W + 0.34 * R + (s.sprinting ? 0.18 : 0) + (s.exhausted ? 0.25 : 0);
+    P.head.x = -P.spine.x * 0.6 + Math.abs(cs) * 0.05 * R;
+
+    // --- braços
+    P.upperArmR.x = sn * (0.38 * W + 1.15 * R) - 0.15 * R;
+    P.upperArmL.x = -sn * (0.38 * W + 1.15 * R) - 0.15 * R;
+    P.upperArmR.z = -0.08 - 0.2 * R;
+    P.upperArmL.z = 0.08 + 0.2 * R;
+    P.forearmR.x = -(0.12 + Math.max(0, -sn) * 0.25) * W - (1.45 + Math.max(0, -sn) * 0.3) * R - 0.1 * (1 - moving);
+    P.forearmL.x = -(0.12 + Math.max(0, sn) * 0.25) * W - (1.45 + Math.max(0, sn) * 0.3) * R - 0.1 * (1 - moving);
+
+    // --- sobe e desce: andar desce no apoio duplo; correr sobe na fase de voo
+    let bob = (Math.abs(cs) - 1) * 0.035 * W + Math.abs(cs) * 0.1 * R;
 
     // parado: respiração e peso
     const idle = 1 - moving;
@@ -140,7 +160,7 @@ export class HumanoidAnimator {
     P.chest.x += breathe * (s.exhausted ? 0.06 : 0.025) * idle;
     P.upperArmR.z -= breathe * 0.02 * idle;
     P.upperArmL.z += breathe * 0.02 * idle;
-    P.pelvis.z = Math.sin(this.t * 0.7) * 0.02 * idle;
+    P.pelvis.z += Math.sin(this.t * 0.7) * 0.02 * idle;
     if (s.exhausted) {
       P.spine.x += 0.3 * idle;
       P.head.x -= 0.1;

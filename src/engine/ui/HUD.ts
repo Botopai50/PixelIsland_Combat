@@ -251,7 +251,8 @@ export class HUD implements ScreenFX {
     const arrows = player.inventory.count('arrow');
     const pend = '';
     this.equipInfo.innerHTML = `<b>${main}</b>${player.mainHand === 'bow' ? '' : off}${pend}<span class="arrows ${arrows === 0 ? 'zero' : ''}">${ITEMS.arrow.icon}<em>${arrows}</em></span>`;
-    this.modeLabel.textContent = firstPerson ? '1ª pessoa' : '3ª pessoa';
+    const gait = player.sprinting ? 'Disparada' : this.ctx.input.walkMode ? 'Andando (Z)' : 'Correndo';
+    this.modeLabel.textContent = `${firstPerson ? '1ª pessoa' : '3ª pessoa'} · ${gait}`;
 
     // boneco de treino
     if (dummy) {
