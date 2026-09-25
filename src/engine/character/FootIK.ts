@@ -43,11 +43,15 @@ export class FootIK {
     root.updateMatrixWorld(true);
     const rootY = root.position.y;
     const J = rig.joints;
+    const moving = this.flat < 0.5;
     const ground = (foot: THREE.Object3D) => {
       foot.getWorldPosition(this.p);
-      const g = this.physics.groundHeight(this.p.x, this.p.z, rootY + 0.45, 0, 0.04);
-      const gy = Number.isFinite(g.y) ? g.y : rootY;
-      return clamp(gy - rootY, -0.45, 0.45);
+      const g = this.physics.groundHeight(this.p.x, this.p.z, rootY + 0.2, 0, 0);
+      if (!Number.isFinite(g.y)) return 0;
+      const d = g.y - rootY;
+      // mais alto que isso é parede/degrau alto: o pé não "escala" até lá
+      if (d > 0.2) return 0;
+      return clamp(d, -0.3, moving ? 0.08 : 0.2) * (moving ? 0.5 : 1);
     };
     this.offL = damp(this.offL, ground(J.footL) * this.w, 18, dt);
     this.offR = damp(this.offR, ground(J.footR) * this.w, 18, dt);
@@ -66,8 +70,10 @@ export class FootIK {
     if (Math.abs(lift) > 0.004) {
       foot.getWorldPosition(this.t);
       this.t.y += lift;
-      shin.getWorldPosition(this.pole);
-      this.pole.addScaledVector(this.fwd, 0.6);
+      // joelho sempre para frente do corpo (direção estável, não depende da pose animada)
+      thigh.getWorldPosition(this.pole);
+      this.pole.addScaledVector(this.fwd, 1.0);
+      this.pole.y -= 0.3;
       solveTwoBoneIK(thigh, shin, THIGH, SHIN, this.t, this.pole, 1);
     }
     // pé rente ao chão: puxa a orientação do pé para "plana" (só o giro do corpo)
