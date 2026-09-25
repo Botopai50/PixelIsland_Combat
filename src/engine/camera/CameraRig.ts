@@ -210,8 +210,7 @@ export class CameraRig implements AimSource {
     eye.y += vis + Math.abs(Math.sin(this.bobPhase * Math.PI * 2)) * 0.018 * bobAmt + this.landDip.value * 0.05;
     eye.addScaledVector(right, Math.sin(this.bobPhase * Math.PI * 2) * 0.008 * bobAmt);
     // escalando: olho um pouco afastado da parede (vê as mãos e a parede subindo)
-    if (p.state === 'climb') eye.addScaledVector(p.climbN, 0.24);
-    else if (p.state === 'mantle') eye.addScaledVector(p.climbN, 0.24 * (1 - clamp01(p.anim.actionU / 0.6)));
+    if (p.state === 'climb' || p.state === 'mantle') eye.addScaledVector(p.climbN, 0.24);
     if (p.state === 'dodge') eye.y -= Math.sin(clamp01(p.stateT / 0.35) * Math.PI) * (p.dodgeType === 'flip' ? 0.25 : 0.12);
     if (p.state === 'dead') eye.y -= clamp01(p.stateT) * 1.2;
 
