@@ -50,6 +50,8 @@ export interface AnimInput {
   attackSpin?: boolean;
   /** Esgueirando (agachado, passos cuidadosos). */
   sneak?: boolean;
+  /** Levantar do esgueirar sem transição (consumido pelo animador). */
+  sneakSnap?: boolean;
   /** Escalada: fase do ciclo, quanto se move (0..1) e salto na parede (0..1). */
   climbPhase?: number;
   climbMove?: number;
@@ -360,6 +362,10 @@ export class HumanoidAnimator {
     // ---------------------------------------------------------------- esgueirar
     // agachado, tronco à frente, cabeça erguida olhando adiante, braços dobrados
     // à frente e pisando na ponta dos pés (o ciclo de marcha continua por cima)
+    if (s.sneakSnap) {
+      this.sneakW = 0;
+      s.sneakSnap = false;
+    }
     this.sneakW = damp(this.sneakW, s.sneak && s.action !== 'dodge' ? 1 : 0, 8, dt);
     const sk = this.sneakW;
     if (sk > 0.001) {

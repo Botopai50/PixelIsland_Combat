@@ -456,6 +456,14 @@ export class PlayerController implements Damageable {
     }
   }
 
+  /** Sai do esgueirar NA HORA (atacar/mirar levanta o personagem instantaneamente). */
+  private standUp() {
+    if (!this.sneaking && this.sneakAmount < 0.01) return;
+    this.sneaking = false;
+    this.sneakAmount = 0;
+    this.anim.sneakSnap = true;
+  }
+
   private faceWall(nx: number, nz: number) {
     this.facing = dirToYaw(-nx, -nz);
   }
@@ -688,6 +696,7 @@ export class PlayerController implements Damageable {
       return false;
     }
     if (cost > 0) this.useStamina(cost);
+    this.standUp();
     this.pickFacingForAttack();
     const T = this.ctx.tuning;
     this.attack = {
@@ -744,6 +753,7 @@ export class PlayerController implements Damageable {
   }
 
   private startCharge() {
+    this.standUp();
     this.attack = null;
     this.chargeT = 0;
     this.chargeReadyFired = false;
@@ -822,6 +832,7 @@ export class PlayerController implements Damageable {
       return;
     }
     this.bowDraw = 0;
+    this.standUp();
     this.setState('bow');
     this.bowLoop = this.ctx.sound.loop('bowDraw');
   }
