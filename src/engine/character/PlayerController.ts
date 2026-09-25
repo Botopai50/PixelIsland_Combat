@@ -128,6 +128,8 @@ export class PlayerController implements Damageable {
   turnRate = 0;
   private lastFacing = 0;
   sprinting = false;
+  private airSpeed = 0;
+  private airSprint = false;
   /** Ângulo atual do golpe (para views). */
   swingAngle = 0;
   swingPhase: 'windup' | 'active' | 'recovery' | 'done' = 'done';
@@ -999,9 +1001,17 @@ export class PlayerController implements Damageable {
         break;
     }
 
+    // momento no ar: o salto mantém a velocidade de decolagem (correndo continua rápido)
+    if (m.grounded) {
+      this.airSpeed = Math.hypot(v.x, v.z);
+      this.airSprint = this.sprinting;
+    } else if (steer && this.state === 'move' && !this.guarding) {
+      maxSpeed = Math.max(maxSpeed, this.airSpeed);
+      this.sprinting = this.airSprint;
+    }
     if (steer) {
       if (!m.grounded) accel *= T.airControl;
-      const tx = mag > 0.05 ? Math.sin(inYaw) * maxSpeed * Math.min(1, mag / 0.55 > 1 ? 1 : 1) : 0;
+      const tx = mag > 0.05 ? Math.sin(inYaw) * maxSpeed : 0;
       const tz = mag > 0.05 ? Math.cos(inYaw) * maxSpeed : 0;
       const speedNow = Math.hypot(v.x, v.z);
       const targetSpeed = Math.hypot(tx, tz);
