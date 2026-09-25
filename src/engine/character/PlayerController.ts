@@ -963,7 +963,10 @@ export class PlayerController implements Damageable {
     this.sneakAmount = damp(this.sneakAmount, this.sneaking ? 1 : 0, 8, dt);
     const locked = !!this.lockTarget;
     const dodgeKey = inp.consume('dodge');
-    const dodgePressed = locked && (dodgeKey || inp.wasPressed('jump'));
+    // travado + só para frente: pular é pulo normal (não há esquiva para a frente)
+    const fwdOnly = inp.moveY > 0.25 && Math.abs(inp.moveX) <= 0.3;
+    const jumpDodges = locked && !fwdOnly;
+    const dodgePressed = locked && (dodgeKey || (jumpDodges && inp.wasPressed('jump')));
     const guardPressed = inp.wasPressed('guard');
     const guardHeld = inp.isHeld('guard');
     if (attackPressed) {
@@ -972,7 +975,7 @@ export class PlayerController implements Damageable {
     }
     if (!inp.isHeld('attack')) this.attackHeld = false;
     if (guardPressed) this.guardPressAt = this.time;
-    if (inp.wasPressed('jump') && !locked) this.jumpBufferedUntil = this.time + T.jumpBuffer;
+    if (inp.wasPressed('jump') && !jumpDodges) this.jumpBufferedUntil = this.time + T.jumpBuffer;
     if (inp.wasReleased('jump') && this.motor.velocity.y > 0 && this.jumpedSinceGround && !this.jumpCut) {
       this.motor.velocity.y *= T.jumpCutMul;
       this.jumpCut = true;
@@ -1194,9 +1197,10 @@ export class PlayerController implements Damageable {
     if (!inp.isHeld('attack')) this.attackHeld = false;
     const lockedB = !!this.lockTarget;
     const dodgeKeyB = inp.consume('dodge');
-    if (lockedB && (dodgeKeyB || inp.wasPressed('jump'))) this.buffered = { kind: 'dodge', t: this.time };
+    const jumpDodgesB = lockedB && !(inp.moveY > 0.25 && Math.abs(inp.moveX) <= 0.3);
+    if (lockedB && (dodgeKeyB || (jumpDodgesB && inp.wasPressed('jump')))) this.buffered = { kind: 'dodge', t: this.time };
     if (inp.wasPressed('guard')) this.guardPressAt = this.time;
-    if (inp.wasPressed('jump') && !lockedB) this.jumpBufferedUntil = this.time + T.jumpBuffer;
+    if (inp.wasPressed('jump') && !jumpDodgesB) this.jumpBufferedUntil = this.time + T.jumpBuffer;
   }
 
   private inChainWindow() {
