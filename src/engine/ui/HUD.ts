@@ -32,6 +32,7 @@ export class HUD implements ScreenFX {
   private hearts: HTMLDivElement;
   private staminaWrap: HTMLDivElement;
   private staminaArc: SVGCircleElement;
+  private stPos = { x: -1, y: -1 };
   private crosshair: HTMLDivElement;
   private hitmark: HTMLDivElement;
   private bowRet: HTMLDivElement;
@@ -221,11 +222,18 @@ export class HUD implements ScreenFX {
     this.staminaWrap.classList.toggle('show', showSt);
     this.staminaWrap.classList.toggle('exhausted', player.exhausted);
     const anchor = this.project(this.v.copy(player.position).setY(player.position.y + 1.5), camera);
+    // 1ª pessoa: fora do centro da tela — centralizada logo acima da barra rápida
+    let sx = anchor.x + 50, sy = anchor.y - 30;
     if (firstPerson) {
-      this.staminaWrap.style.transform = `translate(${window.innerWidth / 2 + 70}px, ${window.innerHeight / 2 + 30}px)`;
-    } else {
-      this.staminaWrap.style.transform = `translate(${anchor.x + 50}px, ${anchor.y - 30}px)`;
+      const hb = this.hotbar.getBoundingClientRect();
+      sx = window.innerWidth / 2;
+      sy = (hb.height ? hb.top : window.innerHeight - 70) - 34;
     }
+    // desliza suave na troca de câmera
+    const k = this.stPos.x < 0 ? 1 : 1 - Math.exp(-realDt * 14);
+    this.stPos.x += (sx - this.stPos.x) * k;
+    this.stPos.y += (sy - this.stPos.y) * k;
+    this.staminaWrap.style.transform = `translate(${this.stPos.x}px, ${this.stPos.y}px)`;
 
     // mira
     const aiming = player.state === 'bow';
