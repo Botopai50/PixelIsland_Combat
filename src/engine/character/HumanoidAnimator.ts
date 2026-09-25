@@ -386,11 +386,11 @@ export class HumanoidAnimator {
       case 'bow': {
         // postura de arqueiro: corpo de lado (ombro esquerdo para o alvo), pés afastados,
         // cabeça virada para o alvo; os braços são posicionados por IK no PlayerView
-        targetBodyYaw = -1.15;
+        targetBodyYaw = -1.42;
         P.pelvis.y += 0.1;
         P.chest.y += -0.12;
-        P.neck.y = 0.5;
-        P.head.y = 0.55;
+        P.neck.y = 0.65;
+        P.head.y = 0.7;
         P.head.x = -s.aimPitch * 0.35;
         P.head.z = 0.08;
         // mirar para cima/baixo inclina o tronco para o lado (o ombro esquerdo sobe/desce)

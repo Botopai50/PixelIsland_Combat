@@ -234,7 +234,7 @@ export class PlayerView {
         const aimDir = this.v.set(Math.sin(p.aim.yaw) * Math.cos(p.aim.pitch), Math.sin(p.aim.pitch), Math.cos(p.aim.yaw) * Math.cos(p.aim.pitch));
         // braço esquerdo esticado a partir do OMBRO real (corpo já girado de lado pelo animador)
         const grip = rig.joints.upperArmL.getWorldPosition(this.hand).addScaledVector(aimDir, 0.54);
-        grip.y -= 0.02;
+        grip.y += 0.07; // braço levemente erguido: a linha da flecha passa na altura do queixo
         const up = this.v2.set(0, 1, 0).addScaledVector(aimDir, -aimDir.y).normalize();
         // leve inclinação do arco (cantado para fora)
         up.applyAxisAngle(aimDir, -0.18);
@@ -248,9 +248,11 @@ export class PlayerView {
         this.pole.addScaledVector(leftOfAim, 0.4).y -= 0.5;
         solveTwoBoneIK(rig.joints.upperArmL, rig.joints.forearmL, ARM_UPPER, ARM_FORE, grip, this.pole, 1);
         // mão direita na corda; na puxada completa chega perto da bochecha
-        const stringPos = this.v2.copy(grip).addScaledVector(aimDir, -0.1 - p.bowDraw * 0.55);
-        // cotovelo direito alto e atrás (linha da flecha)
-        this.pole.copy(stringPos).addScaledVector(aimDir, -0.6).addScaledVector(leftOfAim, -0.35).y += 0.35;
+        // a mão fica do lado do PEITO (à direita da linha da mira), nunca dentro do tronco
+        const stringPos = this.v2.copy(grip).addScaledVector(aimDir, -0.1 - p.bowDraw * 0.55).addScaledVector(leftOfAim, -0.07 * p.bowDraw);
+        stringPos.y += 0.03 * p.bowDraw;
+        // cotovelo direito alto, atrás e para fora do corpo
+        this.pole.copy(stringPos).addScaledVector(aimDir, -0.5).addScaledVector(leftOfAim, -0.45).y += 0.3;
         solveTwoBoneIK(rig.joints.upperArmR, rig.joints.forearmR, ARM_UPPER, ARM_FORE, stringPos, this.pole, 1);
       } else if (sheathed) {
         rig.sockets.back.localToWorld(model.root.position.copy(SHEATH_OFFSET).setX(0.05));
