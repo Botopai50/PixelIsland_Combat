@@ -1609,7 +1609,8 @@ export class PlayerController implements Damageable {
         s.attackSpin = !!cd?.spin;
         s.attackBody = -0.9;
         s.actionU = clamp01(this.chargeT / this.ctx.tuning.chargeTime);
-        s.attackTwist = cd?.work === 'mine' ? 0 : 0.5;
+        // ferramentas: sem torcer o tronco para trás na carga
+        s.attackTwist = cd?.work ? 0 : 0.5;
         break;
       }
       case 'dodge':

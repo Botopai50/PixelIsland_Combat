@@ -568,7 +568,7 @@ export class HumanoidAnimator {
           if (s.attackWork === 'chop') {
             // lenhador: carrega o peso na perna de trás e gira; no corte inclina e transfere o peso
             P.spine.x += 0.12 - 0.08 * antic + 0.2 * commit;
-            P.pelvis.y += 0.25 * antic - 0.15 * commit;
+            P.pelvis.y += (s.action === 'charge' ? 0.05 : 0.25) * antic - 0.15 * commit;
             P.thighR.x += -0.15 * antic;
             P.shinR.x += 0.2 * antic;
             P.shinL.x += 0.2 * commit;

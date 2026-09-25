@@ -188,8 +188,8 @@ export class PlayerView {
           // para a direita e só um pouco para trás (nada atrás da cabeça);
           // gume virado para a frente, pronto para o corte lateral
           const tr = Math.sin(p.time * 40) * 0.03 * clamp01(p.chargeT / T.chargeTime);
-          this.dir.set(-0.62, 0.7 + tr, -0.3).normalize();
-          this.edge.set(0.2, 0.05, 1).normalize();
+          this.dir.set(-0.55, 0.8 + tr, 0.12).normalize();
+          this.edge.set(0.35, 0.05, 1).normalize();
         }
         const { pivot, reach: reach0 } = pivotFor(def);
         // machado carregando: mãos junto ao ombro direito (não esticadas)
