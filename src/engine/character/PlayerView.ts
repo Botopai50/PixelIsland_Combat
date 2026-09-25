@@ -188,6 +188,7 @@ export class PlayerView {
         // machado carregado (golpe lateral): armado NA ALTURA DO GOLPE — mãos na
         // lateral direita da cintura, machado quase horizontal puxado para a
         // direita e um pouco para trás, gume para a frente; no golpe segue reto
+        let axeCock = 0;
         if (def.id === 'axeCharged') {
           let k = 0;
           if (p.state === 'charge') k = 1;
@@ -195,11 +196,13 @@ export class PlayerView {
           if (k > 0) {
             const ck = clamp01(p.chargeT / T.chargeTime);
             const tr = p.state === 'charge' ? Math.sin(p.time * 40) * 0.025 * ck : 0;
-            const bh = this.v.set(-0.3, 1.12, 0.12 - 0.05 * ck);
+            // mão esquerda na base do cabo (frente da barriga); direita acima no cabo
+            const bh = this.v.set(-0.1, 1.08, 0.3 - 0.04 * ck);
             const bd = this.v2.set(-0.82, 0.22 + tr, -0.35 - 0.15 * ck).normalize();
             this.hand.lerp(bh, k);
             this.dir.lerp(bd, k).normalize();
             this.edge.lerp(this.v2.set(0.15, 0, 1).normalize(), k).normalize();
+            axeCock = k;
           }
         }
         this.hand.applyQuaternion(this.yawQ).add(p.position);
@@ -215,6 +218,18 @@ export class PlayerView {
         }
         model.root.position.copy(this.hand);
         model.root.quaternion.copy(this.q);
+        if (axeCock > 0.5) {
+          // machado armado: mão DIREITA acima no cabo (perto do quadril direito),
+          // ESQUERDA na base (frente da barriga); cotovelos para baixo, junto ao corpo
+          const upGrip = this.v2.copy(this.hand).addScaledVector(this.dir, TWO_HAND_GRIP);
+          const fx = Math.sin(yaw), fz = Math.cos(yaw), rx = -Math.cos(yaw), rz = Math.sin(yaw);
+          rig.joints.upperArmR.getWorldPosition(this.pole);
+          this.pole.add(this.v.set(rx * 0.25 - fx * 0.2, -0.9, rz * 0.25 - fz * 0.2));
+          solveTwoBoneIK(rig.joints.upperArmR, rig.joints.forearmR, ARM_UPPER, ARM_FORE, upGrip, this.pole, 1);
+          rig.joints.upperArmL.getWorldPosition(this.pole);
+          this.pole.add(this.v.set(-rx * 0.2 - fx * 0.1, -0.9, -rz * 0.2 - fz * 0.1));
+          solveTwoBoneIK(rig.joints.upperArmL, rig.joints.forearmL, ARM_UPPER, ARM_FORE, this.hand, this.pole, 1);
+        } else {
         // IK do braço direito até a empunhadura
         rig.joints.upperArmR.getWorldPosition(this.pole);
         const right = this.v2.set(-Math.cos(yaw), 0, Math.sin(yaw));
@@ -226,6 +241,7 @@ export class PlayerView {
           rig.joints.upperArmL.getWorldPosition(this.pole);
           this.pole.add(this.v.set(Math.cos(yaw) * 0.5, -0.6, -Math.sin(yaw) * 0.5));
           solveTwoBoneIK(rig.joints.upperArmL, rig.joints.forearmL, ARM_UPPER, ARM_FORE, grip, this.pole, 1);
+        }
         }
       } else if (sheathed) {
         // nas costas
