@@ -222,13 +222,13 @@ export class HUD implements ScreenFX {
     this.staminaWrap.classList.toggle('show', showSt);
     this.staminaWrap.classList.toggle('exhausted', player.exhausted);
     const anchor = this.project(this.v.copy(player.position).setY(player.position.y + 1.5), camera);
-    // 1ª pessoa: fora do centro da tela — centralizada logo acima da barra rápida
+    // 1ª pessoa: anel fino em volta da mira (onde o olho já está)
     let sx = anchor.x + 50, sy = anchor.y - 30;
     if (firstPerson) {
-      const hb = this.hotbar.getBoundingClientRect();
       sx = window.innerWidth / 2;
-      sy = (hb.height ? hb.top : window.innerHeight - 70) - 34;
+      sy = window.innerHeight / 2;
     }
+    this.staminaWrap.classList.toggle('fp', firstPerson);
     // desliza suave na troca de câmera
     const k = this.stPos.x < 0 ? 1 : 1 - Math.exp(-realDt * 14);
     this.stPos.x += (sx - this.stPos.x) * k;

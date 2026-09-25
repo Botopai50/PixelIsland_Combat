@@ -33,6 +33,11 @@ body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit
 .stamina svg { width: 100%; height: 100%; transform: rotate(-90deg); filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
 .st-bg { fill: rgba(0,0,0,.35); stroke: rgba(0,0,0,.45); stroke-width: 6; }
 .st-fg { fill: none; stroke: var(--stamina); stroke-width: 5; stroke-linecap: round; transition: stroke .2s; }
+.stamina { transition: opacity .35s, width .25s, height .25s, margin .25s; }
+.stamina.fp { width: 62px; height: 62px; margin: -31px 0 0 -31px; }
+.stamina.fp svg { filter: drop-shadow(0 0 2px rgba(0,0,0,.55)); }
+.stamina.fp .st-fg { stroke-width: 2.6; }
+.stamina.fp .st-bg { fill: none; stroke-width: 2.6; opacity: .45; }
 .stamina.exhausted .st-fg { stroke: #ff6a4a; animation: blink .3s infinite alternate; }
 @keyframes blink { to { opacity: .45 } }
 
