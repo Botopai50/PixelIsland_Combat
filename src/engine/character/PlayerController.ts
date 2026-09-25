@@ -128,6 +128,11 @@ export class PlayerController implements Damageable {
   private mantleFrom = new THREE.Vector3();
   private mantleTo = new THREE.Vector3();
   private mantleDur = 0.5;
+  /** Agarrou a parede agora (corpo cede com o peso). */
+  climbGrabT = 0;
+  /** Preparação do salto na parede (junta forças antes do impulso). */
+  private climbGatherT = 0;
+  private mantleH = 1;
   private guardPressAt = -10;
 
   // esquiva
@@ -466,6 +471,9 @@ export class PlayerController implements Damageable {
     this.motor.grounded = false;
     this.faceWall(nx, nz);
     this.setState('climb');
+    // agarrou: o corpo "cai" um pouco e segura (peso)
+    this.climbGrabT = 0.35;
+    if (this.ctx.tuning.shakeEnabled) this.ctx.shake.add(0.12);
     this.ctx.events.emit('footstep', { pos: this.position.clone(), surface: 'stone', intensity: 0.5, player: true });
   }
 
@@ -477,7 +485,9 @@ export class PlayerController implements Damageable {
     const inside = this.motor.radius + 0.22;
     this.mantleTo.set(x - nx * inside, top, z - nz * inside);
     const h = Math.max(0, top - this.position.y);
-    this.mantleDur = clamp(0.28 + h * 0.16, 0.3, 0.62);
+    this.mantleH = h;
+    // subir tem esforço: quanto mais alto, mais demora (pendura → puxa → joelho → de pé)
+    this.mantleDur = clamp(0.42 + h * 0.3, 0.5, 1.05);
     this.climbN.set(nx, 0, nz).normalize();
     this.motor.velocity.set(0, 0, 0);
     this.faceWall(nx, nz);
@@ -511,17 +521,27 @@ export class PlayerController implements Damageable {
         this.faceWall(-n.x, -n.z);
         return this.detachClimb(5.5, 5.5);
       }
-      if (this.climbJumpT <= 0 && this.stamina >= 8) {
-        // salto na parede: impulso rápido na direção segurada (padrão: para cima)
-        this.climbJumpT = 0.32;
+      if (this.climbJumpT <= 0 && this.climbGatherT <= 0 && this.stamina >= 8) {
+        // salto na parede: junta forças (agacha na parede) e só então dá o impulso
+        this.climbGatherT = 0.16;
         if (len < 0.2) this.climbJumpDir.set(0, 1);
         else this.climbJumpDir.set(mx, my).normalize();
         this.useStamina(T.dodgeCost * 1.4);
         this.ctx.events.emit('jump', { pos: p.clone() });
       }
     }
-    // velocidade na parede
-    let vx = mx * 1.35, vy = my * 1.5;
+    if (this.climbGatherT > 0) {
+      this.climbGatherT -= dt;
+      if (this.climbGatherT <= 0) this.climbJumpT = 0.32;
+    }
+    this.climbGrabT = Math.max(0, this.climbGrabT - dt);
+    // velocidade na parede: ritmo de braçadas (estica devagar → PUXA com força)
+    const tired = clamp01(1 - this.stamina / (T.staminaMax * 0.3));
+    // pico da puxada no meio de cada braçada (mesma fase da animação)
+    const pull = Math.pow(Math.cos(this.climbPhase * Math.PI * 2), 2);
+    const rhythm = (0.28 + 1.45 * pull) * (1 - 0.35 * tired) * (this.climbGrabT > 0.15 ? 0.2 : 1);
+    let vx = mx * 1.35 * rhythm, vy = my * 1.5 * rhythm;
+    if (this.climbGatherT > 0) { vx = 0; vy = -0.25; }
     if (this.climbJumpT > 0) {
       const k = this.climbJumpT / 0.32;
       vx = this.climbJumpDir.x * 6.5 * k;
@@ -570,7 +590,8 @@ export class PlayerController implements Damageable {
     p.z = hit.z + hit.nz * r;
     this.climbTop = hit.top;
     this.faceWall(n.x, n.z);
-    this.climbPhase += (Math.abs(vy) + Math.abs(vx)) * dt / 0.9;
+    // a fase avança com a intenção de mover (não com a velocidade instantânea)
+    this.climbPhase += (Math.abs(my) * 1.5 + Math.abs(mx) * 1.35) * (1 - 0.35 * tired) * dt / 0.95;
     // chegou ao topo: as mãos passam da borda → sobe
     if (this.climbTop - p.y < 1.3 && vy >= -0.05) {
       return this.startMantle(hit.x, hit.z, hit.nx, hit.nz, this.climbTop);
@@ -583,11 +604,14 @@ export class PlayerController implements Damageable {
   private updateMantle(dt: number) {
     const u = clamp01(this.stateT / this.mantleDur);
     const a = this.mantleFrom, b = this.mantleTo;
-    // sobe primeiro (puxa o corpo), depois passa por cima da borda
-    const up = 1 - Math.pow(1 - clamp01(u / 0.62), 2.2);
-    const fw = clamp01((u - 0.4) / 0.6);
+    // pendura (cede um pouco) → puxa com esforço (começa devagar) → passa o
+    // joelho pela borda → levanta em cima
+    const lift = clamp01((u - 0.12) / 0.55);
+    const up = lift * lift * (3 - 2 * lift);
+    const sag = Math.sin(clamp01(u / 0.14) * Math.PI) * 0.06 * Math.min(1, this.mantleH);
+    const fw = clamp01((u - 0.5) / 0.4);
     const fws = fw * fw * (3 - 2 * fw);
-    this.position.set(lerp(a.x, b.x, fws), lerp(a.y, b.y + 0.04, up), lerp(a.z, b.z, fws));
+    this.position.set(lerp(a.x, b.x, fws), lerp(a.y, b.y + 0.04, up) - sag, lerp(a.z, b.z, fws));
     this.motor.velocity.set(0, 0, 0);
     this.staminaDelay = Math.max(this.staminaDelay, 0.2);
     if (u >= 1) {
@@ -597,7 +621,8 @@ export class PlayerController implements Damageable {
       this.motor.timeSinceGrounded = 0;
       this.climbPushT = 0;
       this.setState('move');
-      this.ctx.events.emit('footstep', { pos: this.position.clone(), surface: this.motor.surface, intensity: 0.6, player: true });
+      // pisa em cima com peso (poeira, som, câmera)
+      this.ctx.events.emit('land', { pos: this.position.clone(), intensity: 0.25, surface: this.motor.surface, player: true });
     }
   }
 
@@ -1492,7 +1517,9 @@ export class PlayerController implements Damageable {
     s.attackSpin = false;
     s.climbPhase = this.climbPhase;
     s.climbMove = this.climbMove;
-    s.climbJump = this.state === 'climb' ? clamp01(this.climbJumpT / 0.32) : 0;
+    s.climbJump = this.state === 'climb' ? clamp01(this.climbJumpT / 0.32) - clamp01(this.climbGatherT / 0.16) : 0;
+    s.climbGrab = clamp01(this.climbGrabT / 0.35);
+    s.climbTired = this.state === 'climb' ? clamp01(1 - this.stamina / (this.ctx.tuning.staminaMax * 0.3)) : 0;
     s.spinYaw = 0;
     const map: Record<PlayerState, AnimAction> = {
       move: 'none', attack: 'attack', charge: 'charge', dodge: 'dodge', bow: 'bow', bowRecover: 'bow', climb: 'climb', mantle: 'mantle',

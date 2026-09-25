@@ -54,6 +54,9 @@ export interface AnimInput {
   climbPhase?: number;
   climbMove?: number;
   climbJump?: number;
+  /** Acabou de agarrar (0..1) e cansaço na parede (0..1). */
+  climbGrab?: number;
+  climbTired?: number;
   spinYaw: number;
   crouch: number;
   dodgeType: DodgeType;
@@ -537,48 +540,66 @@ export class HumanoidAnimator {
         break;
       }
       case 'climb': {
-        // escalada: de frente para a parede, braços alternando acima da cabeça,
-        // pernas dobradas alternando (mão direita sobe com o pé esquerdo)
+        // escalada COM PESO: cada braçada estica (mão alta, cotovelo reto) e
+        // puxa (cotovelo dobra, corpo sobe e encosta); quadril balança de lado;
+        // ao agarrar o corpo cede; cansado, treme
         snappy = true;
         const cp = (s.climbPhase ?? 0) * TAU;
         const mv = s.climbMove ?? 0;
-        const jp = s.climbJump ?? 0;
-        const a = Math.sin(cp) * mv;
-        const hang = Math.sin(this.t * 1.6) * 0.03 * (1 - mv);
-        P.spine.x = 0.08; P.chest.x = -0.05;
-        P.pelvis.x = 0.1;
-        P.head.x = -0.45; P.neck.x = -0.1;
-        P.spine.z = a * 0.06; P.pelvis.z = -a * 0.05;
-        // braços: alcançam para cima da cabeça, um mais alto que o outro
-        P.upperArmR.x = -2.55 - 0.35 * a - 0.5 * jp + hang; P.upperArmL.x = -2.55 + 0.35 * a - 0.5 * jp + hang;
-        P.upperArmR.z = -0.4; P.upperArmL.z = 0.4;
+        const jp = s.climbJump ?? 0; // + impulso · − preparação (agacha)
+        const gr = s.climbGrab ?? 0;
+        const tr = s.climbTired ?? 0;
+        const a = Math.sin(cp) * mv; // + = mão direita alta
+        const pullR = Math.max(0, -Math.cos(cp)) * mv, pullL = Math.max(0, Math.cos(cp)) * mv;
+        const effort = Math.pow(Math.cos(cp), 2) * mv; // pico no meio da puxada
+        const shake = Math.sin(this.t * 38) * 0.05 * tr + Math.sin(this.t * 27) * 0.03 * tr;
+        const breath = Math.sin(this.t * (2 + 4 * tr)) * (0.03 + 0.04 * tr) * (1 - mv);
+        const gather = Math.max(0, -jp), launch = Math.max(0, jp);
+        P.pelvis.x = 0.1 + 0.12 * gather;
+        P.spine.x = 0.05 - 0.12 * effort + 0.25 * gather - 0.1 * launch + breath;
+        P.chest.x = -0.08 - 0.08 * effort;
+        P.head.x = -0.5 + 0.15 * effort + shake * 0.4; P.neck.x = -0.1;
+        P.head.y = a * 0.12;
+        P.spine.z = a * 0.1; P.pelvis.z = -a * 0.14;
+        targetBodyRotZ = a * 0.07;
+        // braços: mão alta com cotovelo quase reto; a que puxa dobra forte
+        P.upperArmR.x = -2.6 - 0.35 * a + 0.35 * pullR - 0.5 * launch + 0.35 * gather + shake;
+        P.upperArmL.x = -2.6 + 0.35 * a + 0.35 * pullL - 0.5 * launch + 0.35 * gather - shake;
+        P.upperArmR.z = -0.42 - 0.1 * pullR; P.upperArmL.z = 0.42 + 0.1 * pullL;
         P.upperArmR.y = 0; P.upperArmL.y = 0;
-        P.forearmR.x = -0.55 + 0.4 * a * (a > 0 ? 1 : 0.3) + 0.3 * jp;
-        P.forearmL.x = -0.55 - 0.4 * a * (a < 0 ? 1 : 0.3) + 0.3 * jp;
-        // pernas: joelhos dobrados contra a parede, subindo alternado
-        P.thighR.x = -0.85 + 0.45 * a + 0.4 * jp; P.thighL.x = -0.85 - 0.45 * a + 0.4 * jp;
-        P.thighR.z = -0.18; P.thighL.z = 0.18;
-        P.shinR.x = 1.2 - 0.35 * a - 0.5 * jp; P.shinL.x = 1.2 + 0.35 * a - 0.5 * jp;
+        P.forearmR.x = -0.3 - 1.25 * pullR - 0.9 * gather + 0.2 * launch - 0.3 * gr;
+        P.forearmL.x = -0.3 - 1.25 * pullL - 0.9 * gather + 0.2 * launch - 0.3 * gr;
+        // pernas: a do lado da mão baixa sobe e empurra
+        P.thighR.x = -0.8 - 0.5 * pullL + 0.35 * pullR - 0.5 * gather + 0.5 * launch - 0.2 * gr;
+        P.thighL.x = -0.8 - 0.5 * pullR + 0.35 * pullL - 0.5 * gather + 0.5 * launch - 0.2 * gr;
+        P.thighR.z = -0.2; P.thighL.z = 0.2;
+        P.shinR.x = 1.15 + 0.5 * pullL - 0.3 * pullR + 0.6 * gather - 0.7 * launch + 0.3 * gr + shake;
+        P.shinL.x = 1.15 + 0.5 * pullR - 0.3 * pullL + 0.6 * gather - 0.7 * launch + 0.3 * gr - shake;
         P.footR.x = -0.35; P.footL.x = -0.35;
-        bodyYOffset = 0.02 * a;
+        // corpo: sobe na puxada, agacha na preparação, cede ao agarrar
+        bodyYOffset = 0.05 * effort - 0.14 * gather - 0.12 * gr;
         break;
       }
       case 'mantle': {
-        // subindo a beirada: puxa com os braços → apoia as mãos e empurra para
-        // baixo com o joelho subindo → fica de pé em cima
+        // subir a beirada com esforço: pendura com braços esticados → puxa
+        // (cotovelos dobram, peito passa a borda) → apoia as mãos e empurra
+        // para baixo, joelho direito sobe na borda → levanta
         snappy = true;
-        const pull = 1 - clamp01(u / 0.45);
-        const push = Math.sin(clamp01(u / 0.85) * Math.PI);
-        const stand = clamp01((u - 0.7) / 0.3);
-        P.upperArmR.x = P.upperArmL.x = -2.4 * pull + 0.35 * push * (1 - pull);
-        P.upperArmR.z = -0.35; P.upperArmL.z = 0.35;
-        P.forearmR.x = P.forearmL.x = -0.9 * pull - 0.3 * push * (1 - pull);
-        P.spine.x = 0.15 + 0.45 * push;
-        P.head.x = -0.35 * pull + 0.1 * push;
-        P.thighR.x = (-1.5 * push) * (1 - stand); P.thighL.x = (-0.6 * push) * (1 - stand);
-        P.shinR.x = (1.9 * push) * (1 - stand) + 0.05; P.shinL.x = (1.2 * push) * (1 - stand) + 0.05;
-        P.footR.x = -0.3 * push; P.footL.x = -0.2 * push;
-        bodyYOffset = -0.12 * push * (1 - stand);
+        const hangK = 1 - clamp01(u / 0.14);
+        const pullK = Math.sin(clamp01((u - 0.08) / 0.5) * Math.PI * 0.5);
+        const press = Math.sin(clamp01((u - 0.45) / 0.45) * Math.PI);
+        const stand = clamp01((u - 0.78) / 0.22);
+        const pre = 1 - clamp01((u - 0.45) / 0.15); // antes de apoiar as mãos
+        P.upperArmR.x = P.upperArmL.x = (-2.7 + 1.1 * pullK) * pre + (0.25 * press) * (1 - pre);
+        P.upperArmR.z = -0.4; P.upperArmL.z = 0.4;
+        P.forearmR.x = P.forearmL.x = (-0.15 - 1.5 * pullK * (1 - hangK)) * pre + (-0.25 * press) * (1 - pre);
+        P.spine.x = 0.1 + 0.35 * pullK * pre + 0.55 * press;
+        P.chest.x = -0.1 * hangK;
+        P.head.x = -0.5 * hangK - 0.2 * pullK * pre + 0.15 * press;
+        P.thighR.x = (-1.6 * press - 0.3 * hangK) * (1 - stand); P.thighL.x = (-0.4 * press + 0.15 * hangK) * (1 - stand);
+        P.shinR.x = (2.0 * press + 0.4 * hangK) * (1 - stand) + 0.05; P.shinL.x = (1.0 * press + 0.3 * hangK) * (1 - stand) + 0.05;
+        P.footR.x = -0.3 * press; P.footL.x = -0.2 * press;
+        bodyYOffset = -0.12 * press * (1 - stand);
         break;
       }
       case 'dodge': {
