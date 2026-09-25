@@ -93,8 +93,12 @@ export class CameraRig implements AimSource {
       const targetYaw = dirToYaw(this.tmp.x, this.tmp.z);
       this.yaw = dampAngle(this.yaw, targetYaw, this.blend > 0.5 ? 10 : 5, realDt);
       const dist = Math.hypot(this.tmp.x, this.tmp.z);
-      const wantPitch = Math.atan2(this.tmp.y - 0.6, dist) - (this.blend > 0.5 ? 0 : 0.18);
-      this.pitch = damp(this.pitch, wantPitch, 4, realDt);
+      // 1ª pessoa: mira no peito do alvo a partir da altura do OLHO (a mira central cai no alvo).
+      // 3ª pessoa: enquadra de cima, com o alvo um pouco abaixo do centro.
+      const firstP = Math.atan2(this.tmp.y - 0.15 - EYE.y, Math.max(0.5, dist - EYE.z));
+      const thirdP = Math.atan2(this.tmp.y - 0.6, dist) - 0.18;
+      const wantPitch = this.blend > 0.5 ? firstP : thirdP;
+      this.pitch = damp(this.pitch, wantPitch, this.blend > 0.5 ? 10 : 4, realDt);
     }
     if (this.recenterT > 0) {
       this.recenterT -= realDt;
