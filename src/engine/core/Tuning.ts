@@ -82,7 +82,7 @@ export interface Tuning {
 
 export function defaultTuning(): Tuning {
   return {
-    walkSpeed: 2.2,
+    walkSpeed: 1.8,
     runSpeed: 5.2,
     sprintSpeed: 7.6,
     acceleration: 38,
@@ -175,7 +175,7 @@ export function rawPreset(t: Tuning): Partial<Tuning> {
   };
 }
 
-const KEY = 'pixelisland-combat.tuning.v1';
+const KEY = 'pixelisland-combat.tuning.v2';
 
 export function saveTuning(t: Tuning) {
   try {
