@@ -41,6 +41,8 @@ export interface AnimInput {
   /** Intensidade do corpo inteiro (0 = só tronco). */
   attackMotion?: number;
   attackOverhead?: boolean;
+  /** Pose de trabalho com ferramenta. */
+  attackWork?: 'chop' | 'mine';
   spinYaw: number;
   crouch: number;
   dodgeType: DodgeType;
@@ -301,6 +303,36 @@ export class HumanoidAnimator {
           P.forearmL.x -= 0.5 * commit * M;
           // agacha no impacto; no vertical, pulinho na preparação
           bodyYOffset += (-0.16 * commit - 0.12 * commit * ov + 0.1 * antic * ov) * M;
+        }
+        // ---- pose de TRABALHO (machado / picareta): pés plantados e afastados, joelhos dobrados
+        if (s.attackWork) {
+          const k = s.attackBody ?? 0;
+          const commit = Math.max(0, k), antic = Math.max(0, -k);
+          // base larga e estável, sem passo
+          P.thighR.x = 0.15; P.thighL.x = -0.25;
+          P.thighR.z = -0.22; P.thighL.z = 0.22;
+          P.shinR.x = 0.45; P.shinL.x = 0.4;
+          P.footR.x = -0.3; P.footL.x = -0.1;
+          bodyYOffset -= 0.08;
+          if (s.attackWork === 'chop') {
+            // lenhador: carrega o peso na perna de trás e gira; no corte inclina e transfere o peso
+            P.spine.x += 0.12 - 0.08 * antic + 0.2 * commit;
+            P.pelvis.y += 0.25 * antic - 0.15 * commit;
+            P.thighR.x += -0.15 * antic;
+            P.shinR.x += 0.2 * antic;
+            P.shinL.x += 0.2 * commit;
+            P.head.y = -s.attackTwist * 0.5; // olhar fica no alvo
+          } else {
+            // mineração: ergue o corpo na preparação, dobra na cintura e nos joelhos no golpe
+            P.spine.x += -0.22 * antic + 0.55 * commit;
+            P.chest.x += -0.1 * antic + 0.15 * commit;
+            P.head.x += 0.15 * antic + 0.1 * commit;
+            P.shinR.x += 0.35 * commit;
+            P.shinL.x += 0.35 * commit;
+            P.thighR.x -= 0.25 * commit;
+            P.thighL.x -= 0.25 * commit;
+            bodyYOffset += 0.04 * antic - 0.14 * commit;
+          }
         }
         if (s.action === 'charge') {
           P.thighR.z = -0.2; P.thighL.z = 0.2;

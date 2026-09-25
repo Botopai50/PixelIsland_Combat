@@ -5,7 +5,7 @@ import { HumanoidAnimator } from './HumanoidAnimator';
 import { solveTwoBoneIK } from './IK';
 import type { PlayerController } from './PlayerController';
 import { createWeaponModel, type WeaponModel } from '../items/WeaponModels';
-import { ATTACKS, ARM_REACH, SHOULDER_R, SPIN_PIVOT, swingDirLocal } from '../combat/Attacks';
+import { ATTACKS, TWO_HAND_GRIP, pivotFor, swingDirLocal } from '../combat/Attacks';
 import { SlashTrail } from '../vfx/Trail';
 import { Spring, clamp01, damp, easeOutBack, yawToDir } from '../core/math';
 import type { ItemId } from '../items/Items';
@@ -161,8 +161,7 @@ export class PlayerView {
           angle = def.arc[0] - sgn * 22 + Math.sin(p.time * 40) * 2 * clamp01(p.chargeT / T.chargeTime);
         }
         swingDirLocal(def, angle, this.dir, this.edge);
-        const pivot = def.pivot === 'center' ? SPIN_PIVOT : SHOULDER_R;
-        const reach = def.pivot === 'center' ? 0.7 : ARM_REACH;
+        const { pivot, reach } = pivotFor(def);
         this.hand.copy(pivot).addScaledVector(this.dir, reach).applyQuaternion(this.yawQ).add(p.position);
         this.hand.y += p.motor.visualStepOffset;
         this.dir.applyQuaternion(this.yawQ);
@@ -181,6 +180,13 @@ export class PlayerView {
         const right = this.v2.set(-Math.cos(yaw), 0, Math.sin(yaw));
         this.pole.addScaledVector(right, 0.5).add(this.v.set(0, -0.6, 0)).addScaledVector(yawToDir(yaw, this.v), -0.3);
         solveTwoBoneIK(rig.joints.upperArmR, rig.joints.forearmR, ARM_UPPER, ARM_FORE, this.hand, this.pole, 1);
+        if (def.work) {
+          // ferramenta: mão esquerda também no cabo (pegada de duas mãos)
+          const grip = this.v2.copy(this.hand).addScaledVector(this.dir, TWO_HAND_GRIP);
+          rig.joints.upperArmL.getWorldPosition(this.pole);
+          this.pole.add(this.v.set(Math.cos(yaw) * 0.5, -0.6, -Math.sin(yaw) * 0.5));
+          solveTwoBoneIK(rig.joints.upperArmL, rig.joints.forearmL, ARM_UPPER, ARM_FORE, grip, this.pole, 1);
+        }
       } else if (sheathed) {
         // nas costas
         rig.sockets.back.localToWorld(model.root.position.copy(SHEATH_OFFSET));
@@ -239,7 +245,9 @@ export class PlayerView {
     const sh = this.shield;
     sh.root.visible = !this.hidden && p.offHand === 'shield';
     if (sh.root.visible) {
-      if (main === 'bow' || sheathed) {
+      // com ferramenta (duas mãos) o escudo fica nas costas, exceto ao defender
+      const toolInHands = (main === 'axe' || main === 'pickaxe') && p.guardAmount < 0.05;
+      if (main === 'bow' || sheathed || toolInHands) {
         rig.sockets.back.localToWorld(sh.root.position.copy(SHIELD_BACK_OFFSET));
         rig.sockets.back.getWorldQuaternion(this.q);
         sh.root.quaternion.copy(this.q).multiply(BACK_SHIELD);

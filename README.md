@@ -80,9 +80,9 @@ A interface alterna sozinha entre modo toque e mouse conforme o dispositivo usad
 - **Guardar armas (estilo BotW)**: fora de combate (2,5 s sem atacar/defender e sem inimigo a 9 m) a arma e o escudo vão para as costas e os braços balançam livres; qualquer ação de combate saca na hora.
 - **Espada**: combo de 3 golpes (horizontal → diagonal ascendente → golpe final vertical);
   segure para o **Ataque Giratório**; golpe aéreo durante o salto.
-- **Machado**: lento e pesado; é a ferramenta da **árvore** (entalhe aprofunda a cada golpe, a
+- **Machado** (ferramenta, duas mãos, pés plantados): golpe de lenhador que para no tronco e é puxado de volta, repetido no ritmo; é a ferramenta da **árvore** (entalhe aprofunda a cada golpe, a
   árvore balança, solta lascas e folhas, tomba na direção do golpe e vira toras).
-- **Picareta**: golpes verticais; é a ferramenta da **pedra** (rachaduras no ponto de contato,
+- **Picareta** (ferramenta, duas mãos): ergue acima da cabeça e desce até o chão curvando o tronco; é a ferramenta da **pedra** (rachaduras no ponto de contato,
   rachaduras estruturais em limiares, escurece, explode em fragmentos e poeira).
   Espada na pedra **ricocheteia** com faíscas.
 - **Arco**: tensão progressiva (som + animação + retícula), força/queda variam com a puxada,
@@ -170,9 +170,9 @@ src/
 | Espada 1/2 | 0.09/0.08 s | 0.09 s | 0.26/0.28 s | 12 | 0.28–0.32 | ~45 ms |
 | Espada final | 0.16 s | 0.10 s | 0.42 s | 22 | 0.65 | ~85 ms |
 | Ataque giratório | 0.05 s | 0.42 s | 0.36 s | 28 | 0.85 | ~120 ms |
-| Machado | 0.20 s | 0.11 s | 0.40 s | 17 | 0.55 | ~80 ms |
+| Machado | 0.30 s | 0.10 s | 0.40 s | 17 | 0.55 | ~80 ms |
 | Machadada carregada | 0.07 s | 0.13 s | 0.60 s | 45 | 1.0 | ~150 ms (+60% no abate) |
-| Picareta | 0.22 s | 0.11 s | 0.42 s | 14 | 0.55 | ~80 ms |
+| Picareta | 0.32 s | 0.10 s | 0.42 s | 14 | 0.55 | ~80 ms |
 | Flecha | — | — | — | 6–24 | 0.25–0.6 | 20–40 ms + "ding" |
 
 \* hit stop = `0.02 + força^1.3 × 0.13` s, reduzido com ferramenta errada, ampliado no abate.

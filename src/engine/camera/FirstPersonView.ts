@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { GameContext } from '../core/Context';
 import type { PlayerController } from '../character/PlayerController';
 import { createWeaponModel, type WeaponModel } from '../items/WeaponModels';
-import { ATTACKS, ARM_REACH, SHOULDER_R, SPIN_PIVOT, swingDirLocal } from '../combat/Attacks';
+import { ATTACKS, TWO_HAND_GRIP, pivotFor, swingDirLocal } from '../combat/Attacks';
 import { SlashTrail } from '../vfx/Trail';
 import { Spring, Spring3, clamp01, damp, easeOutBack, lerp } from '../core/math';
 import { weaponBasis } from '../character/PlayerView';
@@ -190,8 +190,7 @@ export class FirstPersonView {
           angle = d.arc[0] - sgn * 22 + Math.sin(p.time * 40) * 2 * clamp01(p.chargeT / T.chargeTime);
         }
         swingDirLocal(d, angle, this.dir, this.edge);
-        const pivot = d.pivot === 'center' ? SPIN_PIVOT : SHOULDER_R;
-        const reach = d.pivot === 'center' ? 0.7 : ARM_REACH;
+        const { pivot, reach } = pivotFor(d);
         this.hand.copy(pivot).addScaledVector(this.dir, reach).sub(EYE).applyQuaternion(toCam);
         this.dir.applyQuaternion(toCam);
         this.edge.applyQuaternion(toCam);
@@ -214,6 +213,12 @@ export class FirstPersonView {
         model.root.rotateX(-this.kick.value * 0.1);
       }
       this.placeArm(this.armR, model.root.position, 1);
+      const work = (def ?? (this.attackW > 0.01 ? p.attack?.def : null))?.work;
+      if (work) {
+        // pegada de duas mãos no cabo
+        const g = this.v2.set(0, TWO_HAND_GRIP, 0).applyQuaternion(model.root.quaternion).add(model.root.position);
+        this.placeArm(this.armL, g.clone(), -1);
+      }
       const charge = p.state === 'charge' ? clamp01(p.chargeT / T.chargeTime) : 0;
       this.glow = damp(this.glow, charge >= 1 ? 0.6 + Math.sin(p.time * 30) * 0.4 : charge * 0.35, 20, dt);
       model.setGlow(this.glow);
@@ -239,7 +244,8 @@ export class FirstPersonView {
 
     // ------------------------------------------------ escudo
     const sh = this.shield;
-    sh.root.visible = p.offHand === 'shield' && main !== 'bow';
+    const toolMain = main === 'axe' || main === 'pickaxe';
+    sh.root.visible = p.offHand === 'shield' && main !== 'bow' && !(toolMain && (this.armL.visible || p.guardAmount < 0.05) && (p.state === 'attack' || p.state === 'charge'));
     if (sh.root.visible) {
       const g = p.guardAmount;
       const pos = this.v2.set(lerp(-0.36, -0.13, g), lerp(-0.42, -0.2, g), lerp(-0.4, -0.46, g)).add(offset);

@@ -1184,6 +1184,7 @@ export class PlayerController implements Damageable {
     s.crouch = damp(s.crouch, this.state === 'charge' ? 0.55 : this.guarding ? 0.25 : 0, 12, dt);
     s.attackTwist = 0;
     s.attackMotion = 0;
+    s.attackWork = undefined;
     s.spinYaw = 0;
     const map: Record<PlayerState, AnimAction> = {
       move: 'none', attack: 'attack', charge: 'charge', dodge: 'dodge', bow: 'bow', bowRecover: 'bow',
@@ -1207,6 +1208,7 @@ export class PlayerController implements Damageable {
         s.attackSide = Math.sign(a.def.arc[1] - a.def.arc[0]) * (a.def.roll > 60 ? 0 : 1);
         s.attackMotion = a.def.bodyMotion ?? 0;
         s.attackOverhead = !!a.def.overhead;
+        s.attackWork = a.def.work;
         if (a.def.spin) {
           const ang = this.swingAngle;
           s.spinYaw = ((60 - ang) * Math.PI) / 180;
@@ -1214,11 +1216,15 @@ export class PlayerController implements Damageable {
         }
         break;
       }
-      case 'charge':
+      case 'charge': {
         s.attackMotion = 0;
+        const cd = this.weapon?.charged ? ATTACKS[this.weapon.charged] : null;
+        s.attackWork = cd?.work;
+        s.attackBody = -0.9;
         s.actionU = clamp01(this.chargeT / this.ctx.tuning.chargeTime);
-        s.attackTwist = 0.5;
+        s.attackTwist = cd?.work === 'mine' ? 0 : 0.5;
         break;
+      }
       case 'dodge':
         s.actionU = clamp01(this.stateT / this.dodgeDur);
         s.dodgeType = this.dodgeType;

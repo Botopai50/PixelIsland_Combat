@@ -27,7 +27,8 @@ export interface AttackDef {
   roll: number;
   /** Inclina o plano para frente/baixo (graus). */
   pitch: number;
-  pivot: 'right' | 'center';
+  /** right = ombro direito (uma mão); center = giro do corpo; chest = ferramenta com as duas mãos. */
+  pivot: 'right' | 'center' | 'chest';
   /** Velocidade de avanço durante preparação/golpe (m/s). */
   lunge: number;
   /** Segundos dentro da recuperação a partir dos quais defesa/esquiva cancelam. */
@@ -51,6 +52,8 @@ export interface AttackDef {
   bodyMotion?: number;
   /** Golpe vertical com pulinho na preparação e descida com o peso todo. */
   overhead?: boolean;
+  /** Uso de ferramenta (pose de trabalho, duas mãos, pés plantados). */
+  work?: 'chop' | 'mine';
   label: string;
 }
 
@@ -89,14 +92,15 @@ export const ATTACKS: Record<string, AttackDef> = {
   flurryB: A({ id: 'flurryB', label: 'Rajada', windup: 0.02, active: 0.06, recovery: 0.03, damage: 8, strength: 0.35, knockback: 1, hitStop: 0.03, shake: 0.12, arc: [-80, 80], roll: -25, pitch: 10, lunge: 0, whoosh: 0.35, bodyTwist: 0.5, bodyMotion: 0.4 }),
 
   // --------------------------------------------------------- machado: lento, pesado
-  axe1: A({ id: 'axe1', label: 'Machadada', windup: 0.2, active: 0.11, recovery: 0.4, damage: 17, strength: 0.55, knockback: 4.5, hitStop: 0.075, shake: 0.24, arc: [100, -55], roll: -10, pitch: 12, lunge: 0, cancelAt: 0.14, chainAt: 0.1, next: 'axe2', whoosh: 0.6 }),
-  axe2: A({ id: 'axe2', label: 'Revés', windup: 0.18, active: 0.11, recovery: 0.44, damage: 17, strength: 0.55, knockback: 4.5, hitStop: 0.075, shake: 0.24, arc: [-100, 55], roll: 12, pitch: 12, lunge: 0, cancelAt: 0.14, chainAt: 0.12, next: 'axe1', whoosh: 0.6 }),
-  axeCharged: A({ id: 'axeCharged', label: 'Machadada Carregada', windup: 0.07, active: 0.13, recovery: 0.6, damage: 45, strength: 1, knockback: 9, hitStop: 0.15, shake: 0.62, arc: [140, -40], roll: 90, pitch: 0, lunge: 0, cancelAt: 0.3, whoosh: 1, bodyTwist: 0.2, stamina: 25 }),
+  // Ferramentas: golpes de TRABALHO. Duas mãos no cabo, pés plantados, ritmo repetido.
+  // Machado: corte horizontal de lenhador que PARA no tronco (não atravessa o corpo) e é puxado de volta.
+  axe1: A({ id: 'axe1', label: 'Machadada', windup: 0.3, active: 0.1, recovery: 0.4, damage: 17, strength: 0.55, knockback: 3, hitStop: 0.08, shake: 0.22, arc: [120, -12], roll: -4, pitch: 18, pivot: 'chest', lunge: 0, cancelAt: 0.14, chainAt: 0.16, next: 'axe1', whoosh: 0.55, bodyTwist: 0.45, work: 'chop' }),
+  axeCharged: A({ id: 'axeCharged', label: 'Machadada Carregada', windup: 0.08, active: 0.12, recovery: 0.55, damage: 45, strength: 1, knockback: 6, hitStop: 0.15, shake: 0.6, arc: [150, -20], roll: -4, pitch: 22, pivot: 'chest', lunge: 0, cancelAt: 0.3, whoosh: 1, bodyTwist: 0.6, stamina: 25, work: 'chop' }),
 
   // --------------------------------------------------------- picareta: golpes verticais
-  pick1: A({ id: 'pick1', label: 'Picaretada', windup: 0.22, active: 0.11, recovery: 0.42, damage: 14, strength: 0.55, knockback: 3, hitStop: 0.075, shake: 0.22, arc: [125, -50], roll: 90, pitch: 0, lunge: 0, cancelAt: 0.14, chainAt: 0.1, next: 'pick2', whoosh: 0.55, bodyTwist: 0.15 }),
-  pick2: A({ id: 'pick2', label: 'Picaretada', windup: 0.2, active: 0.11, recovery: 0.44, damage: 14, strength: 0.55, knockback: 3, hitStop: 0.075, shake: 0.22, arc: [125, -50], roll: 68, pitch: 0, lunge: 0, cancelAt: 0.14, chainAt: 0.1, next: 'pick1', whoosh: 0.55, bodyTwist: 0.2 }),
-  pickCharged: A({ id: 'pickCharged', label: 'Picaretada Carregada', windup: 0.07, active: 0.12, recovery: 0.55, damage: 38, strength: 0.95, knockback: 6, hitStop: 0.13, shake: 0.55, arc: [140, -50], roll: 90, pitch: 0, lunge: 0, cancelAt: 0.3, whoosh: 0.95, bodyTwist: 0.15, stamina: 25 }),
+  // Picareta: ergue acima da cabeça e desce até o chão à frente, dobrando o tronco.
+  pick1: A({ id: 'pick1', label: 'Picaretada', windup: 0.32, active: 0.1, recovery: 0.42, damage: 14, strength: 0.55, knockback: 2, hitStop: 0.08, shake: 0.22, arc: [155, -62], roll: 90, pitch: 0, pivot: 'chest', lunge: 0, cancelAt: 0.14, chainAt: 0.16, next: 'pick1', whoosh: 0.5, bodyTwist: 0, work: 'mine' }),
+  pickCharged: A({ id: 'pickCharged', label: 'Picaretada Carregada', windup: 0.08, active: 0.11, recovery: 0.55, damage: 38, strength: 0.95, knockback: 4, hitStop: 0.13, shake: 0.55, arc: [165, -66], roll: 90, pitch: 0, pivot: 'chest', lunge: 0, cancelAt: 0.3, whoosh: 0.95, bodyTwist: 0, stamina: 25, work: 'mine' }),
 
   // --------------------------------------------------------- clava (inimigo): preparação longa e legível
   club1: A({ id: 'club1', label: 'Clava', windup: 0.55, active: 0.14, recovery: 0.6, damage: 18, strength: 0.6, knockback: 6, hitStop: 0.08, shake: 0.35, arc: [125, -35], roll: 70, pitch: 0, lunge: 3.2, whoosh: 0.7 }),
@@ -105,8 +109,8 @@ export const ATTACKS: Record<string, AttackDef> = {
 
 export const WEAPONS: Record<WeaponDef['id'], WeaponDef> = {
   sword: { id: 'sword', tool: 'sword', bladeStart: 0.1, bladeEnd: 1.0, hitRadius: 0.08, combo: ['sword1', 'sword2', 'sword3'], charged: 'swordSpin', air: 'swordAir', equipTime: 0.22, trailColor: 0xcfe8ff, weaponGuard: 0.5, sound: 'blade' },
-  axe: { id: 'axe', tool: 'axe', bladeStart: 0.3, bladeEnd: 0.85, hitRadius: 0.13, combo: ['axe1', 'axe2'], charged: 'axeCharged', air: 'swordAir', equipTime: 0.3, trailColor: 0xffd9a0, weaponGuard: 0.35, sound: 'blunt' },
-  pickaxe: { id: 'pickaxe', tool: 'pickaxe', bladeStart: 0.3, bladeEnd: 0.85, hitRadius: 0.11, combo: ['pick1', 'pick2'], charged: 'pickCharged', air: 'swordAir', equipTime: 0.3, trailColor: 0xd8e0ff, weaponGuard: 0.3, sound: 'blunt' },
+  axe: { id: 'axe', tool: 'axe', bladeStart: 0.3, bladeEnd: 0.85, hitRadius: 0.13, combo: ['axe1'], charged: 'axeCharged', air: 'swordAir', equipTime: 0.3, trailColor: 0xffd9a0, weaponGuard: 0.35, sound: 'blunt' },
+  pickaxe: { id: 'pickaxe', tool: 'pickaxe', bladeStart: 0.3, bladeEnd: 0.85, hitRadius: 0.11, combo: ['pick1'], charged: 'pickCharged', air: 'swordAir', equipTime: 0.3, trailColor: 0xd8e0ff, weaponGuard: 0.3, sound: 'blunt' },
   bow: { id: 'bow', tool: 'arrow', bladeStart: 0, bladeEnd: 0, hitRadius: 0, combo: [], equipTime: 0.25, trailColor: 0xffffff, weaponGuard: 0, sound: 'blunt' },
   club: { id: 'club', tool: 'club', bladeStart: 0.25, bladeEnd: 0.95, hitRadius: 0.13, combo: ['club1', 'club2'], equipTime: 0.3, trailColor: 0xff8080, weaponGuard: 0.3, sound: 'blunt' },
 };
@@ -178,6 +182,16 @@ export function swingDirLocal(def: AttackDef, angleDeg: number, outDir: THREE.Ve
 export const SHOULDER_R = new THREE.Vector3(-0.2, 1.38, 0.04);
 export const SPIN_PIVOT = new THREE.Vector3(0, 1.12, 0);
 export const ARM_REACH = 0.56;
+export const CHEST_PIVOT = new THREE.Vector3(0, 1.28, 0.1);
+/** Ponto em que a mão esquerda segura o cabo nas ferramentas de duas mãos (m, ao longo da arma). */
+export const TWO_HAND_GRIP = 0.3;
+
+/** Pivô e alcance do braço para um golpe (usado por lógica, 3ª e 1ª pessoa). */
+export function pivotFor(def: AttackDef): { pivot: THREE.Vector3; reach: number } {
+  if (def.pivot === 'center') return { pivot: SPIN_PIVOT, reach: 0.7 };
+  if (def.pivot === 'chest') return { pivot: CHEST_PIVOT, reach: 0.5 };
+  return { pivot: SHOULDER_R, reach: ARM_REACH };
+}
 
 /**
  * Segmento de acerto da arma em coordenadas de MUNDO, a partir da posição/rotação
@@ -189,8 +203,7 @@ export function bladeSegmentWorld(
   outHand: THREE.Vector3, outBase: THREE.Vector3, outTip: THREE.Vector3, outDir: THREE.Vector3, outEdge: THREE.Vector3,
 ) {
   swingDirLocal(def, angleDeg, outDir, outEdge);
-  const pivot = def.pivot === 'center' ? SPIN_PIVOT : SHOULDER_R;
-  const reach = def.pivot === 'center' ? 0.7 : ARM_REACH;
+  const { pivot, reach } = pivotFor(def);
   outHand.copy(pivot).multiplyScalar(scale).addScaledVector(outDir, reach * scale);
   _q.setFromAxisAngle(U, yaw);
   outHand.applyQuaternion(_q).add(feet);
