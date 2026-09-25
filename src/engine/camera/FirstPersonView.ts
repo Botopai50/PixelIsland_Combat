@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import type { GameContext } from '../core/Context';
 import type { PlayerController } from '../character/PlayerController';
 import { createWeaponModel, BOW_DRAW_LEN, type WeaponModel } from '../items/WeaponModels';
-import { ATTACKS, TWO_HAND_GRIP, pivotFor, swingDirLocal } from '../combat/Attacks';
+import { ATTACKS, TWO_HAND_GRIP } from '../combat/Attacks';
+import { viewmodelStyle, viewmodelSwingPose } from './ViewmodelSwings';
 import { SlashTrail } from '../vfx/Trail';
 import { Spring, Spring3, clamp01, damp, easeOutBack, lerp } from '../core/math';
 import { weaponBasis } from '../character/PlayerView';
@@ -16,8 +17,9 @@ export const EYE = new THREE.Vector3(0, 1.62, 0.1);
 
 /**
  * Viewmodel da 1ª pessoa: braços e equipamento desenhados numa cena própria
- * (sem atravessar paredes). Os golpes usam a MESMA trajetória lógica da 3ª
- * pessoa, convertida para o espaço da câmera — o que se vê é o que acerta.
+ * (sem atravessar paredes). Os golpes usam poses desenhadas para leitura na
+ * câmera (ViewmodelSwings), sincronizadas com as fases lógicas do golpe: a
+ * lâmina cruza o centro da tela durante a janela de dano.
  */
 export class FirstPersonView {
   readonly scene = new THREE.Scene();
@@ -32,15 +34,15 @@ export class FirstPersonView {
   private shieldKick = new Spring(240, 15);
   private bobPhase = 0;
   private attackW = 0;
+  /** Escudo recolhe para baixo durante o golpe: o arco da lâmina fica legível. */
+  private shieldTuck = 0;
   private equipScale = 1;
   private lastMain: ItemId | null = null;
   private lastYaw = 0;
   private lastPitch = 0;
   private glow = 0;
   private landDip = new Spring(160, 12);
-  private q = new THREE.Quaternion();
-  private qInv = new THREE.Quaternion();
-  private qYaw = new THREE.Quaternion();
+  private q2 = new THREE.Quaternion();
   private v = new THREE.Vector3();
   private v2 = new THREE.Vector3();
   private dir = new THREE.Vector3();
@@ -162,17 +164,10 @@ export class FirstPersonView {
     for (const [id, m] of this.models) m.root.visible = id === main;
     const model = main ? this.models.get(main) : undefined;
 
-    // ------------------------------------------------ conversão personagem → câmera
-    // câmera = R_y(yaw+π)·R_x(pitch); personagem = R_y(yaw) ⇒ local = qInv·R_y(yaw)·v
-    camera.getWorldQuaternion(this.qInv).invert();
-    this.qYaw.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.facing);
-    const toCam = this.q.copy(this.qInv).multiply(this.qYaw);
-
     // ------------------------------------------------ arma principal
     this.armR.visible = false;
     this.armL.visible = false;
     const def = p.state === 'attack' && p.attack ? p.attack.def : p.state === 'charge' && p.weapon?.charged ? ATTACKS[p.weapon.charged] : null;
-    const wantAttackW = def ? 1 : 0;
     this.attackW = def ? 1 : damp(this.attackW, 0, 14, dt);
     if (model && main !== 'bow') {
       model.root.scale.set(1, T.rangeMul, 1);
@@ -183,29 +178,29 @@ export class FirstPersonView {
       weaponBasis(restDir, restEdge, this.restQ);
       if (sprint) this.restQ.premultiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.5, 0.3, 0)));
       if (def || this.attackW > 0.01) {
+        // golpes desenhados para a câmera (clareza), no mesmo tempo da lógica
         const d = def ?? p.attack?.def ?? ATTACKS.sword1;
-        let angle = p.swingAngle;
+        const style = viewmodelStyle(d.id);
+        let phase: 'windup' | 'active' | 'recovery' | 'done' | 'charge' = p.swingPhase;
+        let u = p.swingU;
+        if (p.state === 'charge') phase = 'charge';
+        else if (!def) { phase = 'recovery'; u = 1; }
+        viewmodelSwingPose(style, phase, u, this.restPos, this.restQ, this.hand, this.q2);
         if (p.state === 'charge') {
-          const sgn = Math.sign(d.arc[1] - d.arc[0]) || 1;
-          angle = d.arc[0] - sgn * 22 + Math.sin(p.time * 40) * 2 * clamp01(p.chargeT / T.chargeTime);
+          // tremor crescente segurando a carga
+          const c = clamp01(p.chargeT / T.chargeTime);
+          this.hand.x += Math.sin(p.time * 47) * 0.004 * c;
+          this.hand.y += Math.sin(p.time * 53) * 0.004 * c;
         }
-        swingDirLocal(d, angle, this.dir, this.edge);
-        const { pivot, reach } = pivotFor(d);
-        this.hand.copy(pivot).addScaledVector(this.dir, reach).sub(EYE).applyQuaternion(toCam);
-        this.dir.applyQuaternion(toCam);
-        this.edge.applyQuaternion(toCam);
-        const q = weaponBasis(this.dir, this.edge, new THREE.Quaternion());
         if (this.kick.value) {
-          const axis = this.v2.crossVectors(this.dir, this.edge).normalize();
-          q.premultiply(new THREE.Quaternion().setFromAxisAngle(axis, -this.kick.value * 0.12));
+          // recuo no impacto: a arma volta um pouco contra o sentido do golpe
+          this.hand.z += this.kick.value * 0.025;
+          this.q2.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -this.kick.value * 0.08));
         }
-        // na preparação o braço lógico fica fora do campo de visão (atrás/ao lado):
-        // mistura parcial com a pose de descanso para a antecipação ser visível.
-        let w = wantAttackW ? 1 : this.attackW;
-        if (p.state === 'charge') w = 0.6;
-        else if (p.attack && p.swingPhase === 'windup') w = 0.5 + 0.5 * clamp01(p.stateT / Math.max(1e-3, p.attack.timing.windup));
+        this.hand.add(offset);
+        const w = def ? 1 : this.attackW;
         model.root.position.copy(this.restPos).lerp(this.hand, w);
-        model.root.quaternion.copy(this.restQ).slerp(q, w);
+        model.root.quaternion.copy(this.restQ).slerp(this.q2, w);
       } else {
         model.root.position.copy(this.restPos);
         model.root.position.z += this.kick.value * 0.03;
@@ -257,9 +252,13 @@ export class FirstPersonView {
     sh.root.visible = p.offHand === 'shield' && main !== 'bow' && !toolMain;
     if (sh.root.visible) {
       const g = p.guardAmount;
+      const tuckTo = p.state === 'attack' ? 1 : 0;
+      this.shieldTuck += (tuckTo - this.shieldTuck) * (1 - Math.exp(-dt * (tuckTo ? 18 : 7)));
+      const tk = this.shieldTuck * (1 - g);
       const pos = this.v2.set(lerp(-0.36, -0.13, g), lerp(-0.42, -0.2, g), lerp(-0.4, -0.46, g)).add(offset);
       pos.z += this.shieldKick.value * 0.05;
-      pos.y -= lower * 0.5;
+      pos.y -= lower * 0.5 + tk * 0.2;
+      pos.x -= tk * 0.1;
       sh.root.position.copy(pos);
       sh.root.quaternion.setFromEuler(new THREE.Euler(lerp(0.1, -0.08, g) - this.shieldKick.value * 0.1, Math.PI + lerp(-1.1, -0.15, g), lerp(0.2, 0.05, g)));
       sh.setGlow(p.state === 'guardHit' ? 0.3 : 0);
