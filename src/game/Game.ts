@@ -280,6 +280,7 @@ export class Game {
 
     // HUD
     const d = this.arena.dummy;
+    this.touch.setJumpIsDodge(!!this.player.lockTarget);
     this.hud.update(clock.realDt, cam, this.player, first, { lastDamage: d.lastDamage, combo: d.combo, dps: d.dps, pos: d.pos });
 
     // render: mundo + viewmodel (profundidade limpa → armas não atravessam paredes)

@@ -22,6 +22,8 @@ export class TouchControls {
   private lookId = -1;
   private lookLast = { x: 0, y: 0 };
   private sprintOn = false;
+  private jumpLabel: HTMLSpanElement | null = null;
+  private jumpIsDodge = false;
   lookSensitivity = 2.1;
   active = false;
 
@@ -42,7 +44,6 @@ export class TouchControls {
       { action: 'attack', label: 'Atacar', cls: 'b-attack', hold: true },
       { action: 'guard', label: 'Defender', cls: 'b-guard', hold: true },
       { action: 'jump', label: 'Pular', cls: 'b-jump', hold: true },
-      { action: 'dodge', label: 'Esquiva', cls: 'b-dodge', hold: true },
       { action: 'sprint', label: 'Correr', cls: 'b-sprint', toggle: true },
       { action: 'lock', label: 'Travar', cls: 'b-lock', hold: true },
     ];
@@ -51,6 +52,7 @@ export class TouchControls {
       const e = document.createElement('div');
       e.className = `t-btn ${b.cls}`;
       e.innerHTML = `<span>${b.label}</span>`;
+      if (b.action === 'jump') this.jumpLabel = e.querySelector('span');
       e.addEventListener('pointerdown', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
@@ -166,6 +168,14 @@ export class TouchControls {
     const m = Math.hypot(mx, my);
     if (m < 0.12) mx = my = 0; // zona morta
     this.input.setTouchMove(mx, my);
+  }
+
+  /** Mira travada: o botão de pular vira esquiva (como no BotW). */
+  setJumpIsDodge(on: boolean) {
+    if (on === this.jumpIsDodge || !this.jumpLabel) return;
+    this.jumpIsDodge = on;
+    this.jumpLabel.textContent = on ? 'Esquiva' : 'Pular';
+    this.jumpLabel.parentElement?.classList.toggle('as-dodge', on);
   }
 
   setActive(v: boolean) {

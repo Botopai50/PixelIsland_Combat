@@ -698,7 +698,11 @@ export class PlayerController implements Damageable {
     // ---------------------------------------------- inputs de ação (com buffer)
     const attackPressed = inp.consume('attack');
     const attackReleased = inp.wasReleased('attack');
-    const dodgePressed = inp.consume('dodge');
+    // Esquiva como no BotW: só com a mira travada, e aí o botão de PULAR esquiva
+    // (Ctrl/C/L também, mas só travado). Sem travar, pular pula.
+    const locked = !!this.lockTarget;
+    const dodgeKey = inp.consume('dodge');
+    const dodgePressed = locked && (dodgeKey || inp.wasPressed('jump'));
     const guardPressed = inp.wasPressed('guard');
     const guardHeld = inp.isHeld('guard');
     if (attackPressed) {
@@ -707,7 +711,7 @@ export class PlayerController implements Damageable {
     }
     if (!inp.isHeld('attack')) this.attackHeld = false;
     if (guardPressed) this.guardPressAt = this.time;
-    if (inp.wasPressed('jump')) this.jumpBufferedUntil = this.time + T.jumpBuffer;
+    if (inp.wasPressed('jump') && !locked) this.jumpBufferedUntil = this.time + T.jumpBuffer;
     if (inp.wasReleased('jump') && this.motor.velocity.y > 0 && this.jumpedSinceGround && !this.jumpCut) {
       this.motor.velocity.y *= T.jumpCutMul;
       this.jumpCut = true;
@@ -927,9 +931,11 @@ export class PlayerController implements Damageable {
       this.buffered = { kind: 'attack', t: this.time };
     }
     if (!inp.isHeld('attack')) this.attackHeld = false;
-    if (inp.consume('dodge')) this.buffered = { kind: 'dodge', t: this.time };
+    const lockedB = !!this.lockTarget;
+    const dodgeKeyB = inp.consume('dodge');
+    if (lockedB && (dodgeKeyB || inp.wasPressed('jump'))) this.buffered = { kind: 'dodge', t: this.time };
     if (inp.wasPressed('guard')) this.guardPressAt = this.time;
-    if (inp.wasPressed('jump')) this.jumpBufferedUntil = this.time + T.jumpBuffer;
+    if (inp.wasPressed('jump') && !lockedB) this.jumpBufferedUntil = this.time + T.jumpBuffer;
   }
 
   private inChainWindow() {

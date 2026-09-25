@@ -44,7 +44,7 @@ itch.io, Netlify…).
 | Espaço | Pular — segurar = salto mais alto |
 | Botão esquerdo / J | Atacar · **segurar** = ataque carregado · com arco: puxar e soltar |
 | Botão direito / K | Defender · **no instante do golpe** = APARO · cancela o arco |
-| Ctrl / C / L | Esquiva estilo BotW: ←/→ salto lateral · para trás ou parado = pulo para trás |
+| Espaço (com mira travada) | Esquiva estilo BotW, só travado (Ctrl/C/L também): ←/→ salto lateral · para trás ou parado = pulo para trás |
 | Q / botão do meio | Lock-on (travar no inimigo) · sem alvo: recentraliza a câmera |
 | V | Alternar 1ª / 3ª pessoa |
 | T | Trocar ombro da câmera |
