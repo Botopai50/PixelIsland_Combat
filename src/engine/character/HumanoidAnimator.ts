@@ -100,6 +100,10 @@ export class HumanoidAnimator {
   private lean = 0;
   private wasGrounded = true;
   private airVy = 0;
+  private airT = 0;
+  private airFromJump = false;
+  private landLevel = 0;
+  private landHold = 0;
   private squash = 1;
   private readyW = 0;
   private runW = 0;
@@ -125,7 +129,12 @@ export class HumanoidAnimator {
   private fk: Record<JointName, THREE.Quaternion>;
 
   land(intensity: number) {
-    this.landImpact = Math.max(this.landImpact, clamp01(intensity));
+    const k = clamp01(intensity);
+    if (k < 0.04) return;
+    // mínimo visível mesmo em quedas pequenas; quedas altas seguram mais tempo
+    this.landImpact = Math.max(this.landImpact, 0.2 + 0.8 * k);
+    this.landLevel = Math.max(k, this.landImpact > 0.3 ? this.landLevel * 0.5 : 0);
+    this.landHold = 0.03 + 0.32 * k * k;
   }
   kick(amount: number) {
     this.recoilV += amount;
@@ -321,37 +330,72 @@ export class HumanoidAnimator {
     this.lastStepSign = stepSign;
 
     // ---------------------------------------------------------------- ar
+    // fases: IMPULSO (sai empurrando) → SUBIDA (joelho da frente alto, braços
+    // sobem) → ÁPICE (recolhido) → QUEDA (pernas descem se preparando, braços
+    // abrem para equilibrar) → QUEDA LONGA (pedala e gira os braços, desesperado)
     if (!s.grounded) {
+      this.airT += dt;
+      const t = this.airT;
       const up = clamp01(s.vy / 6);
-      const down = clamp01(-s.vy / 10);
-      P.thighR.x = lerp(-0.35, -1.35, up) + down * 0.5;
-      P.shinR.x = lerp(0.6, 1.9, up) - down * 0.4;
-      // perna de trás: recolhida sob o corpo (o pé não fica "largado" para trás)
-      P.thighL.x = lerp(0.0, 0.12, up) - down * 0.3;
-      P.shinL.x = lerp(0.35, 0.55, up) + down * 0.15;
-      P.upperArmR.z = -0.55 - up * 0.3 - down * 0.8;
-      P.upperArmL.z = 0.55 + up * 0.3 + down * 0.8;
-      P.upperArmR.x = -0.6 * up + 0.2 * down;
-      P.upperArmL.x = -0.3 * up - 0.3 * down;
-      P.forearmR.x = -0.9;
-      P.forearmL.x = -0.9;
-      P.spine.x = 0.2 * up - down * 0.3;
-      P.head.x = -0.15 * up + down * 0.2;
+      const down = clamp01(-s.vy / 9);
+      const apex = 1 - clamp01(Math.abs(s.vy) / 3.5);
+      const push = this.airFromJump ? 1 - clamp01(t / 0.16) : 0;
+      const longFall = clamp01((-s.vy - 8.5) / 7);
+      const pedal = Math.sin(t * 13), wind = Math.sin(t * 9);
+      // pernas
+      P.thighR.x = -0.35 - 0.95 * up - 0.5 * apex + 0.45 * down;
+      P.shinR.x = 0.55 + 1.2 * up + 0.7 * apex - 0.25 * down;
+      P.thighL.x = 0.15 * push - 0.35 * apex - 0.1 * up + 0.2 * down;
+      P.shinL.x = 0.3 + 0.35 * up + 0.9 * apex + 0.05 * down - 0.1 * push;
+      P.footR.x = 0.2 * up - 0.25 * down; P.footL.x = 0.35 * push - 0.2 * down;
+      P.thighR.z = -0.08 * down; P.thighL.z = 0.08 * down;
+      // braços: sobem com o impulso, abrem no ápice e na queda
+      P.upperArmR.x = -1.1 * push - 0.7 * up - 0.3 * apex - 0.35 * down;
+      P.upperArmL.x = -0.9 * push - 0.5 * up - 0.3 * apex - 0.3 * down;
+      P.upperArmR.z = -0.35 - 0.35 * apex - 1.0 * down;
+      P.upperArmL.z = 0.35 + 0.35 * apex + 1.0 * down;
+      P.forearmR.x = -0.9 + 0.4 * down; P.forearmL.x = -0.9 + 0.4 * down;
+      // tronco: arqueia no impulso, recolhe no ápice, cabeça olha o chão na queda
+      P.spine.x = -0.12 * push + 0.15 * up + 0.3 * apex - 0.1 * down;
+      P.head.x = -0.1 * up + 0.35 * down;
+      // queda longa: pedala as pernas e gira os braços
+      if (longFall > 0) {
+        P.thighR.x += pedal * 0.55 * longFall; P.thighL.x -= pedal * 0.55 * longFall;
+        P.shinR.x += (0.5 + Math.max(0, -pedal) * 0.6) * longFall; P.shinL.x += (0.5 + Math.max(0, pedal) * 0.6) * longFall;
+        P.upperArmR.x += wind * 0.9 * longFall; P.upperArmL.x -= wind * 0.9 * longFall;
+        P.upperArmR.z -= 0.3 * longFall; P.upperArmL.z += 0.3 * longFall;
+        P.spine.x -= 0.25 * longFall;
+        P.head.x += 0.15 * longFall;
+      }
       bob = 0;
+    } else {
+      this.airT = 0;
     }
-    // aterrissagem proporcional à velocidade de queda
+    this.airFromJump = !s.grounded && (this.airFromJump || (this.wasGrounded && s.vy > 2));
+    // aterrissagem proporcional à velocidade de queda (≈ altura)
     if (!s.grounded) this.airVy = s.vy;
-    if (s.grounded && !this.wasGrounded) this.land(clamp01((-this.airVy - 2) / 12) * 0.9 + 0.15);
+    if (s.grounded && !this.wasGrounded) this.land(clamp01((-this.airVy - 2) / 13));
     this.wasGrounded = s.grounded;
 
-    // aterrissagem: agacha proporcional ao impacto
-    this.landImpact = damp(this.landImpact, 0, 7, dt);
+    // aterrissagem em níveis: leve (dobra os joelhos) · média (agacha, braços à
+    // frente) · pesada (agacha fundo, mão direita no chão, cabeça baixa, segura
+    // um instante antes de levantar)
+    if (this.landHold > 0) this.landHold -= dt;
+    else this.landImpact = damp(this.landImpact, 0, lerp(9, 3.2, this.landLevel), dt);
     const li = this.landImpact;
-    P.thighR.x -= li * 0.95; P.thighL.x -= li * 0.95;
-    P.shinR.x += li * 1.6; P.shinL.x += li * 1.6;
-    P.footR.x -= li * 0.5; P.footL.x -= li * 0.5;
-    P.spine.x += li * 0.5;
-    P.upperArmR.z -= li * 0.5; P.upperArmL.z += li * 0.5;
+    const hv = clamp01((this.landLevel - 0.5) / 0.4) * li; // pesada
+    P.thighR.x -= li * 0.95; P.thighL.x -= li * 1.05;
+    P.shinR.x += li * 1.6; P.shinL.x += li * 1.7;
+    P.footR.x -= li * 0.5; P.footL.x -= li * 0.55;
+    P.spine.x += li * 0.5 + hv * 0.35;
+    P.head.x -= hv * 0.35;
+    P.upperArmR.z -= li * 0.4; P.upperArmL.z += li * 0.5;
+    P.upperArmR.x -= li * 0.45 * (1 - hv); P.upperArmL.x -= li * 0.35;
+    P.forearmR.x -= li * 0.5 * (1 - hv); P.forearmL.x -= li * 0.6;
+    // pesada: joelho de trás quase no chão, mão direita apoiada à frente
+    P.thighR.x += hv * 0.55; P.shinR.x += hv * 0.35;
+    P.upperArmR.x += hv * (-0.45 - P.upperArmR.x * 0.6); P.upperArmR.z -= hv * 0.15;
+    P.forearmR.x += hv * (-0.15 - P.forearmR.x * 0.6);
 
     // agachamento genérico (defesa, carga)
     const cr = s.crouch;
@@ -786,10 +830,10 @@ export class HumanoidAnimator {
     b.rotation.set(this.bodyRotX, this.bodyYaw, this.bodyRotZ, 'YXZ');
     // estica no ar (subindo rápido) e achata na aterrissagem
     const stretch = s.grounded ? 0 : clamp(Math.abs(s.vy) * 0.012, 0, 0.1);
-    const sy = 1 + stretch - li * 0.16;
+    const sy = 1 + stretch - li * (0.12 + 0.1 * this.landLevel);
     this.squash = damp(this.squash, sy, 25, dt);
     b.scale.set(1 / Math.sqrt(this.squash), this.squash, 1 / Math.sqrt(this.squash));
-    b.position.y = this.rig.bodyPivotY + this.bodyY - li * 0.2 - cr * 0.12 - this.sneakW * 0.32 + bob;
+    b.position.y = this.rig.bodyPivotY + this.bodyY - li * (0.16 + 0.26 * this.landLevel) - cr * 0.12 - this.sneakW * 0.32 + bob;
   }
 }
 

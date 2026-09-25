@@ -150,8 +150,8 @@ export class FeedbackDirector {
     });
     E.on('land', ({ pos, intensity, player }) => {
       S.play('land', { pos, intensity });
-      fx.dust(pos, 0.3 + intensity * 1.2, 0.3 + intensity * 0.4);
-      if (player && intensity > 0.45) ctx.shake.add(intensity * 0.25);
+      fx.dust(pos, 0.3 + intensity * 1.6, 0.3 + intensity * 0.7);
+      if (player && intensity > 0.35) ctx.shake.add(intensity * intensity * 0.45);
     });
     E.on('dodge', ({ pos }) => {
       S.play('dodge', { pos });

@@ -136,6 +136,8 @@ export class PlayerController implements Damageable {
   private climbGatherT = 0;
   private mantleH = 1;
   private mantleJerked = false;
+  /** Recuperação da aterrissagem pesada (anda devagar). */
+  private landLagT = 0;
   private guardPressAt = -10;
 
   // esquiva
@@ -1232,6 +1234,7 @@ export class PlayerController implements Damageable {
     const inp = ctx.input;
     const m = this.motor;
     const v = m.velocity;
+    this.landLagT = Math.max(0, this.landLagT - dt);
     const mag = Math.min(1, Math.hypot(inp.moveX, inp.moveY));
     const inYaw = this.inputYaw();
     // travado no alvo não corre (andaria de costas/de lado em disparada)
@@ -1261,6 +1264,7 @@ export class PlayerController implements Damageable {
         } else {
           // dois estados claros: ANDAR (padrão) e CORRER (segurando Correr/Shift)
           maxSpeed = T.walkSpeed * Math.min(1, mag / 0.8) * (this.exhausted ? 0.75 : 1);
+          if (this.landLagT > 0) maxSpeed *= 0.15;
           if (this.sneaking) maxSpeed *= 0.55;
           else if (wantSprint && m.grounded) {
             maxSpeed = T.runSpeed;
@@ -1432,6 +1436,8 @@ export class PlayerController implements Damageable {
       this.ctx.shake.add(0.35);
     } else if (m.landedThisFrame) {
       const intensity = clamp01((m.landSpeed - 3) / 14);
+      // queda alta: o impacto prende o personagem um instante
+      if (intensity > 0.45) this.landLagT = 0.12 + 0.4 * (intensity - 0.45);
       this.ctx.events.emit('land', { pos: this.position.clone(), intensity, surface: m.surface, player: true });
     }
   }
