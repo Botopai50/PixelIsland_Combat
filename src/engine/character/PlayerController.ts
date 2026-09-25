@@ -525,16 +525,16 @@ export class PlayerController implements Damageable {
     this.cancelActions();
     this.guarding = false;
     // Esquiva estilo BotW: sem rolamento. Saltos laterais para os lados,
-    // mortal para trás (sem direção ou para trás) e um salto curto para frente.
+    // pulo para trás (sem direção ou para trás) e um salto curto para frente.
     // Referência: o alvo travado ou, sem lock, a direção da câmera.
     const refYaw = this.lockTarget ? this.facing : this.aim.yaw;
     let type: DodgeType;
     let dirYaw: number;
     let durMul: number;
     if (!hasInput || inp.moveY < -0.5) {
-      type = this.aim.firstPerson ? 'back' : 'flip';
+      type = 'back';
       dirYaw = refYaw + Math.PI;
-      durMul = type === 'flip' ? 1.1 : 0.8;
+      durMul = 0.85;
     } else if (Math.abs(inp.moveX) >= Math.abs(inp.moveY) * 0.8) {
       type = inp.moveX < 0 ? 'hopL' : 'hopR';
       dirYaw = refYaw + (inp.moveX < 0 ? Math.PI / 2 : -Math.PI / 2);
@@ -552,8 +552,8 @@ export class PlayerController implements Damageable {
     this.iFramesUntil = this.time + T.dodgeIFrameEnd * durMul;
     this.iFramesFrom = this.time + T.dodgeIFrameStart;
     this.useStamina(T.dodgeCost);
-    if (type === 'flip') this.motor.velocity.y = 6.4;
-    if (type === 'hopL' || type === 'hopR' || type === 'back' || type === 'hopF') this.motor.velocity.y = 4.2;
+    if (type === 'back') this.motor.velocity.y = 4.8;
+    else if (type === 'hopL' || type === 'hopR' || type === 'hopF') this.motor.velocity.y = 4.2;
     this.ctx.events.emit('dodge', { pos: this.position.clone() });
     // esquiva perfeita: algum inimigo prestes a acertar?
     for (const th of this.ctx.threats()) {
@@ -1041,7 +1041,7 @@ export class PlayerController implements Damageable {
         steer = false;
         faceMode = 'none';
         const u = clamp01(this.stateT / this.dodgeDur);
-        const dist = T.dodgeDistance * (this.dodgeType === 'back' ? 0.6 : this.dodgeType === 'flip' ? 0.9 : this.dodgeType === 'hopF' ? 0.75 : 1);
+        const dist = T.dodgeDistance * (this.dodgeType === 'back' ? 0.8 : this.dodgeType === 'flip' ? 0.9 : this.dodgeType === 'hopF' ? 0.75 : 1);
         const sp = (dist / this.dodgeDur) * (1.4 - 0.8 * u);
         v.x = this.dodgeDir.x * sp;
         v.z = this.dodgeDir.z * sp;
@@ -1242,7 +1242,8 @@ export class PlayerController implements Damageable {
     s.runSpeed = this.ctx.tuning.runSpeed;
     s.walkSpeed = this.ctx.tuning.walkSpeed;
     s.moveAngle = s.speed > 0.2 ? angleDelta(this.facing, dirToYaw(v.x, v.z)) : 0;
-    s.strafing = this.aim.firstPerson || !!this.lockTarget || this.guarding || this.state === 'bow' || this.state === 'bowRecover' || this.state === 'charge';
+    // na esquiva nada de torção de strafe no quadril: travado fica igual a destravado
+    s.strafing = this.state !== 'dodge' && (this.aim.firstPerson || !!this.lockTarget || this.guarding || this.state === 'bow' || this.state === 'bowRecover' || this.state === 'charge');
     s.grounded = this.motor.grounded;
     s.vy = v.y;
     s.turnRate = this.turnRate;

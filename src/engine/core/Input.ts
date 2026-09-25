@@ -108,7 +108,7 @@ export class Input {
   attachKeyboardMouse(canvas: HTMLCanvasElement) {
     const keyMap: Record<string, Action> = {
       Space: 'jump', ShiftLeft: 'sprint', ShiftRight: 'sprint',
-      KeyC: 'dodge', AltLeft: 'dodge', AltRight: 'dodge',
+      ControlLeft: 'dodge', ControlRight: 'dodge', KeyC: 'dodge', AltLeft: 'dodge', AltRight: 'dodge',
       KeyQ: 'lock', KeyV: 'view', KeyT: 'shoulder', Tab: 'inventory', KeyI: 'inventory',
       KeyP: 'tweak', KeyB: 'juice', KeyG: 'spawn', KeyR: 'reset', KeyH: 'help', KeyZ: 'runToggle', CapsLock: 'runToggle',
       KeyJ: 'attack', KeyK: 'guard', KeyL: 'dodge',
@@ -121,6 +121,9 @@ export class Input {
       else if (c === 'KeyS' || c === 'ArrowDown') this.keyMove.b = down ? 1 : 0;
       else if (c === 'KeyA' || c === 'ArrowLeft') this.keyMove.l = down ? 1 : 0;
       else if (c === 'KeyD' || c === 'ArrowRight') this.keyMove.r = down ? 1 : 0;
+      // Ctrl é a esquiva: bloqueia os atalhos do navegador com Ctrl (Ctrl+S, D, A…)
+      // enquanto joga. Ctrl+W/T/N o navegador não deixa bloquear fora da tela cheia.
+      if (e.ctrlKey && c !== 'ControlLeft' && c !== 'ControlRight') e.preventDefault();
       const a = keyMap[c];
       if (a) {
         if (e.repeat) {

@@ -2,7 +2,7 @@
 
 Protótipo 3D jogável em **Three.js + TypeScript** para desenvolver e testar a *sensação* de
 movimentação e combate — inspirado no combate de aventura em 3ª pessoa estilo *Zelda: Breath of the Wild*
-(lock-on, saltos laterais, mortal para trás, ataque giratório, aparo com escudo, esquiva perfeita com
+(lock-on, saltos laterais, pulo para trás, ataque giratório, aparo com escudo, esquiva perfeita com
 rajada). Cenário e modelos são simples de propósito; o foco é o acabamento das interações:
 peso, resposta imediata, impacto e clareza.
 
@@ -44,7 +44,7 @@ itch.io, Netlify…).
 | Espaço | Pular — segurar = salto mais alto |
 | Botão esquerdo / J | Atacar · **segurar** = ataque carregado · com arco: puxar e soltar |
 | Botão direito / K | Defender · **no instante do golpe** = APARO · cancela o arco |
-| C / Alt / L | Esquiva estilo BotW: ←/→ salto lateral · para trás ou parado = mortal para trás · para frente = salto curto |
+| Ctrl / C / L | Esquiva estilo BotW: ←/→ salto lateral · para trás ou parado = pulo para trás · para frente = salto curto |
 | Q / botão do meio | Lock-on (travar no inimigo) · sem alvo: recentraliza a câmera |
 | V | Alternar 1ª / 3ª pessoa |
 | T | Trocar ombro da câmera |

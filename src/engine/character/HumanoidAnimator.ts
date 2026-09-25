@@ -515,12 +515,22 @@ export class HumanoidAnimator {
           P.upperArmR.z = -1.5 * tuck; P.upperArmL.z = 1.5 * tuck;
           bodyYOffset = 0.3 * tuck;
         } else if (s.dodgeType === 'back') {
+          // pulo para trás (BotW): impulso inclinando para trás, pernas recolhidas
+          // à frente no ar, braços à frente para equilibrar, aterrissa agachado
           const k = Math.sin(u * Math.PI);
-          P.spine.x = -0.35 * k;
-          P.thighR.x = -0.5 * k; P.shinR.x = 0.7 * k;
-          P.thighL.x = 0.3 * k; P.shinL.x = 0.5 * k;
-          P.upperArmR.x = P.upperArmL.x = -0.6 * k;
-          bodyYOffset = 0.08 * k;
+          const push = Math.sin(clamp01(u / 0.35) * Math.PI) * (u < 0.35 ? 1 : 0);
+          const land = clamp01((u - 0.75) / 0.25);
+          P.spine.x = -0.3 * k + 0.15 * push + 0.25 * land;
+          P.chest.x = -0.1 * k;
+          P.head.x = 0.2 * k;
+          P.thighR.x = -0.75 * k; P.shinR.x = 1.0 * k + 0.3 * land;
+          P.thighL.x = -0.45 * k; P.shinL.x = 0.8 * k + 0.3 * land;
+          P.footR.x = P.footL.x = 0.25 * k;
+          P.upperArmR.x = P.upperArmL.x = -0.75 * k;
+          P.upperArmR.z = -0.35 * k; P.upperArmL.z = 0.35 * k;
+          P.forearmR.x = P.forearmL.x = -0.4 * k;
+          targetBodyRotX = -0.18 * k;
+          bodyYOffset = 0.1 * k - 0.1 * land;
         } else {
           // salto lateral (BotW): corpo inclina para o lado do salto, pernas juntas recolhidas
           const side = s.dodgeType === 'hopL' ? 1 : -1;
