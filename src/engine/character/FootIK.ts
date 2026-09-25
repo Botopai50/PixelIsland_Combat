@@ -49,12 +49,12 @@ export class FootIK {
       const g = this.physics.groundHeight(this.p.x, this.p.z, rootY + 0.2, 0, 0);
       if (!Number.isFinite(g.y)) return 0;
       const d = g.y - rootY;
-      // mais alto que isso é parede/degrau alto: o pé não "escala" até lá
-      if (d > 0.2) return 0;
-      return clamp(d, -0.3, moving ? 0.08 : 0.2) * (moving ? 0.5 : 1);
+      // só DESCE o pé até um chão mais baixo (borda de degrau). Nunca levanta:
+      // o corpo já se apoia na superfície mais alta, levantar só criava pernas estranhas.
+      return clamp(d, -0.3, 0) * (moving ? 0.5 : 1);
     };
-    this.offL = damp(this.offL, ground(J.footL) * this.w, 18, dt);
-    this.offR = damp(this.offR, ground(J.footR) * this.w, 18, dt);
+    this.offL = damp(this.offL, ground(J.footL) * this.w, 12, dt);
+    this.offR = damp(this.offR, ground(J.footR) * this.w, 12, dt);
     // o quadril desce para o pé mais baixo alcançar o chão (nunca sobe)
     this.pelvis = damp(this.pelvis, Math.min(this.offL, this.offR, 0), 14, dt);
     rig.body.position.y += this.pelvis;

@@ -94,8 +94,18 @@ export class HumanoidAnimator {
 
   constructor(public rig: HumanoidRig) {
     this.pose = {} as Pose;
-    for (const j of JOINTS) this.pose[j] = new THREE.Euler();
+    this.fk = {} as Record<JointName, THREE.Quaternion>;
+    for (const j of JOINTS) {
+      this.pose[j] = new THREE.Euler();
+      this.fk[j] = rig.joints[j].quaternion.clone();
+    }
   }
+  /**
+   * Estado FK próprio do animador. O IK (pés, braços com arma) altera os ossos
+   * DEPOIS de cada quadro; se a suavização partisse dos ossos, o resultado do IK
+   * realimentaria o próximo quadro (pé "mole", perna balançando).
+   */
+  private fk: Record<JointName, THREE.Quaternion>;
 
   land(intensity: number) {
     this.landImpact = Math.max(this.landImpact, clamp01(intensity));
@@ -562,7 +572,8 @@ export class HumanoidAnimator {
     const k = 1 - Math.exp(-rate * dt);
     for (const j of JOINTS) {
       this.targetQ.setFromEuler(P[j]);
-      this.rig.joints[j].quaternion.slerp(this.targetQ, k);
+      this.fk[j].slerp(this.targetQ, k);
+      this.rig.joints[j].quaternion.copy(this.fk[j]);
     }
     // corpo: rotações grandes (rolamento) aplicadas direto para não "desenrolar" pelo caminho curto
     if (s.action === 'dodge' && s.dodgeType === 'flip') this.bodyRotX = targetBodyRotX;
