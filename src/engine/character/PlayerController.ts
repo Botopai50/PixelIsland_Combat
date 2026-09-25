@@ -1161,6 +1161,7 @@ export class PlayerController implements Damageable {
     s.runSpeed = this.ctx.tuning.runSpeed;
     s.walkSpeed = this.ctx.tuning.walkSpeed;
     s.moveAngle = s.speed > 0.2 ? angleDelta(this.facing, dirToYaw(v.x, v.z)) : 0;
+    s.strafing = this.aim.firstPerson || !!this.lockTarget || this.guarding || this.state === 'bow' || this.state === 'bowRecover' || this.state === 'charge';
     s.grounded = this.motor.grounded;
     s.vy = v.y;
     s.turnRate = this.turnRate;

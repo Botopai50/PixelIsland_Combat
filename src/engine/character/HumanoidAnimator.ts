@@ -21,6 +21,8 @@ export interface AnimInput {
   speed: number;
   runSpeed: number;
   walkSpeed?: number;
+  /** Andando de lado/de costas de propósito (lock-on, defesa, mira, 1ª pessoa). */
+  strafing?: boolean;
   /** Direção do movimento relativa à frente do personagem (rad). */
   moveAngle: number;
   grounded: boolean;
@@ -71,6 +73,7 @@ export class HumanoidAnimator {
   private airVy = 0;
   private squash = 1;
   private runW = 0;
+  private hipYawS = 0;
   /** Mola de recuo (usada ao bater/bloquear): empurra tronco e braços. */
   recoil = 0;
   private recoilV = 0;
@@ -106,7 +109,9 @@ export class HumanoidAnimator {
     // estratégia de strafe: quadril aponta para a direção do movimento
     let hipYaw = 0;
     let dirSign = 1;
-    if (moving > 0.05 && Math.abs(s.moveAngle) > 0.2) {
+    // só em strafe: numa curva normal a velocidade e o corpo se separam por um instante,
+    // e usar essa diferença fazia o quadril "estalar" para o lado (ou para trás na inversão)
+    if (s.strafing && moving > 0.05 && Math.abs(s.moveAngle) > 0.2) {
       let a = s.moveAngle;
       if (Math.abs(a) > Math.PI * 0.62) {
         dirSign = -1; // andando de costas
@@ -114,6 +119,9 @@ export class HumanoidAnimator {
       }
       hipYaw = clamp(a, -1.1, 1.1);
     }
+    // suaviza a torção do quadril (sem estalos ao trocar de direção)
+    this.hipYawS = damp(this.hipYawS, hipYaw, 10, dt);
+    hipYaw = this.hipYawS;
     // dois ciclos distintos, misturados pelo peso `run`:
     //  ANDAR  — postura ereta, sempre um pé no chão, braços soltos quase esticados,
     //           quadril balança de lado, corpo desce no apoio duplo.
@@ -391,7 +399,8 @@ export class HumanoidAnimator {
     P.upperArmR.x -= this.recoil * 0.6;
 
     // inclinação nas curvas (estilo corrida de aventura)
-    this.lean = damp(this.lean, clamp(-s.turnRate * 0.1 * clamp01(speed / 4), -0.5, 0.5), 8, dt);
+    // inclinação na curva: limitada e suave (giros rápidos não dão "tranco")
+    this.lean = damp(this.lean, clamp(-s.turnRate * 0.045 * clamp01((speed - 1) / 4), -0.22, 0.22), 5, dt);
     targetBodyRotZ += s.grounded && s.action === 'none' ? this.lean : 0;
 
     // ---------------------------------------------------------------- aplica com suavização
