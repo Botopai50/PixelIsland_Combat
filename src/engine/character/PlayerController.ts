@@ -167,7 +167,8 @@ export class PlayerController implements Damageable {
     return w ? WEAPONS[w] : null;
   }
   get hasShield() {
-    return this.offHand === 'shield' && this.mainHand !== 'bow';
+    // arco e ferramentas de duas mãos guardam o escudo nas costas
+    return this.offHand === 'shield' && this.mainHand !== 'bow' && this.mainHand !== 'axe' && this.mainHand !== 'pickaxe';
   }
   get invulnerable() {
     return this.time >= this.iFramesFrom && this.time < this.iFramesUntil;

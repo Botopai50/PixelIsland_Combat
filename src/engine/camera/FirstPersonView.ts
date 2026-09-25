@@ -211,10 +211,19 @@ export class FirstPersonView {
         model.root.position.z += this.kick.value * 0.03;
         model.root.quaternion.copy(this.restQ);
         model.root.rotateX(-this.kick.value * 0.1);
+        const g = p.guardAmount;
+        if ((main === 'axe' || main === 'pickaxe') && g > 0.01) {
+          // defesa com ferramenta: cabo atravessado na frente da câmera
+          const gp = this.v2.set(0.24, -0.2, -0.42).add(offset);
+          gp.z += this.shieldKick.value * 0.04;
+          const gq = weaponBasis(this.dir.set(-1, 0.28, -0.1).normalize(), this.edge.set(0, 1, 0.2).normalize(), new THREE.Quaternion());
+          model.root.position.lerp(gp, g);
+          model.root.quaternion.slerp(gq, g);
+        }
       }
       this.placeArm(this.armR, model.root.position, 1);
       const work = (def ?? (this.attackW > 0.01 ? p.attack?.def : null))?.work;
-      if (work) {
+      if (work || main === 'axe' || main === 'pickaxe') {
         // pegada de duas mãos no cabo
         const g = this.v2.set(0, TWO_HAND_GRIP, 0).applyQuaternion(model.root.quaternion).add(model.root.position);
         this.placeArm(this.armL, g.clone(), -1);
@@ -245,7 +254,7 @@ export class FirstPersonView {
     // ------------------------------------------------ escudo
     const sh = this.shield;
     const toolMain = main === 'axe' || main === 'pickaxe';
-    sh.root.visible = p.offHand === 'shield' && main !== 'bow' && !(toolMain && (this.armL.visible || p.guardAmount < 0.05) && (p.state === 'attack' || p.state === 'charge'));
+    sh.root.visible = p.offHand === 'shield' && main !== 'bow' && !toolMain;
     if (sh.root.visible) {
       const g = p.guardAmount;
       const pos = this.v2.set(lerp(-0.36, -0.13, g), lerp(-0.42, -0.2, g), lerp(-0.4, -0.46, g)).add(offset);

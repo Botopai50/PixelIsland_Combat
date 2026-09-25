@@ -198,6 +198,24 @@ export class PlayerView {
         rig.sockets.handR.getWorldQuaternion(this.q);
         model.root.quaternion.copy(this.q).multiply(REST_WEAPON);
         if (this.weaponSpring.value !== 0) model.root.rotateX(-this.weaponSpring.value * 0.1);
+        const g = p.guardAmount;
+        if ((main === 'axe' || main === 'pickaxe') && g > 0.01) {
+          // defesa com ferramenta: cabo na horizontal à frente do peito, duas mãos
+          const hand = this.v2.set(-0.22, 1.3 - this.shieldSpring.value * 0.03, 0.38).applyQuaternion(this.yawQ).add(p.position);
+          hand.y += p.motor.visualStepOffset;
+          const dir = this.dir.set(1, 0.3, 0.1).normalize().applyQuaternion(this.yawQ);
+          const edge = this.edge.set(0, 1, 0);
+          weaponBasis(dir, edge, this.q2);
+          model.root.position.lerp(hand, g);
+          model.root.quaternion.slerp(this.q2, g);
+          rig.joints.upperArmR.getWorldPosition(this.pole);
+          this.pole.add(this.v.set(-Math.cos(yaw) * 0.5, -0.6, Math.sin(yaw) * 0.5));
+          solveTwoBoneIK(rig.joints.upperArmR, rig.joints.forearmR, ARM_UPPER, ARM_FORE, model.root.position, this.pole, g);
+          const grip = this.v.copy(dir).multiplyScalar(0.45).add(model.root.position);
+          rig.joints.upperArmL.getWorldPosition(this.pole);
+          this.pole.add(this.hand.set(Math.cos(yaw) * 0.5, -0.6, -Math.sin(yaw) * 0.5));
+          solveTwoBoneIK(rig.joints.upperArmL, rig.joints.forearmL, ARM_UPPER, ARM_FORE, grip, this.pole, g);
+        }
       }
       // brilho de carga
       const charge = p.state === 'charge' ? clamp01(p.chargeT / T.chargeTime) : 0;
@@ -250,7 +268,7 @@ export class PlayerView {
     sh.root.visible = !this.hidden && p.offHand === 'shield';
     if (sh.root.visible) {
       // com ferramenta (duas mãos) o escudo fica nas costas, exceto ao defender
-      const toolInHands = (main === 'axe' || main === 'pickaxe') && p.guardAmount < 0.05;
+      const toolInHands = main === 'axe' || main === 'pickaxe';
       if (main === 'bow' || sheathed || toolInHands) {
         rig.sockets.back.localToWorld(sh.root.position.copy(SHIELD_BACK_OFFSET));
         rig.sockets.back.getWorldQuaternion(this.q);
