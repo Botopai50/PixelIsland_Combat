@@ -31,12 +31,13 @@ export class FootIK {
 
   /** Chamar depois do animador (FK) e antes do IK dos braços. */
   /** @param flatten quanto o pé é alinhado ao chão (1 parado; baixo andando, para manter calcanhar/ponta). */
-  update(dt: number, rig: HumanoidRig, enabled: boolean, flatten = 0.5) {
+  update(dt: number, rig: HumanoidRig, enabled: boolean, flatten = 0.5, airborne = false) {
     this.flat = flatten;
     if (dt <= 0) return;
     // desliga NA HORA ao sair do chão (senão o pé é puxado para baixo/trás no salto);
     // liga de volta suavemente depois de apoiar
-    this.w = enabled ? damp(this.w, 1, 10, dt) : 0;
+    // liga suave ao parar; desliga rápido ao sair do chão ou começar a andar
+    this.w = airborne ? 0 : enabled ? damp(this.w, 1, 8, dt) : damp(this.w, 0, 25, dt);
     if (this.w < 0.01) {
       // sem IK de pernas; o quadril volta suave (sem "pulo" visual ao sair de uma borda)
       this.offL = this.offR = 0;
@@ -48,7 +49,6 @@ export class FootIK {
     root.updateMatrixWorld(true);
     const rootY = root.position.y;
     const J = rig.joints;
-    const moving = this.flat < 0.5;
     const ground = (foot: THREE.Object3D) => {
       foot.getWorldPosition(this.p);
       const g = this.physics.groundHeight(this.p.x, this.p.z, rootY + 0.2, 0, 0);
@@ -56,7 +56,7 @@ export class FootIK {
       const d = g.y - rootY;
       // só DESCE o pé até um chão mais baixo (borda de degrau). Nunca levanta:
       // o corpo já se apoia na superfície mais alta, levantar só criava pernas estranhas.
-      return clamp(d, -0.3, 0) * (moving ? 0.5 : 1);
+      return clamp(d, -0.3, 0);
     };
     this.offL = damp(this.offL, ground(J.footL) * this.w, 12, dt);
     this.offR = damp(this.offR, ground(J.footR) * this.w, 12, dt);
@@ -81,10 +81,11 @@ export class FootIK {
       this.pole.y -= 0.3;
       solveTwoBoneIK(thigh, shin, THIGH, SHIN, this.t, this.pole, 1);
     }
-    // pé rente ao chão: puxa a orientação do pé para "plana" (só o giro do corpo)
+    // pé plano no chão (só o giro do corpo) — totalmente quando a perna foi ajustada
     foot.parent!.updateWorldMatrix(true, false);
     foot.parent!.getWorldQuaternion(this.qParent);
     this.qFoot.copy(this.qParent).invert().multiply(this.qRoot);
-    foot.quaternion.slerp(this.qFoot, this.flat * this.w);
+    const f = Math.abs(lift) > 0.004 ? 1 : this.flat;
+    foot.quaternion.slerp(this.qFoot, f * this.w);
   }
 }

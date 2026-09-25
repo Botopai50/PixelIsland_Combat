@@ -511,7 +511,7 @@ export class Enemy implements Damageable, Threat {
       a.hurtX = this.hurtDir.x * f.z - this.hurtDir.z * f.x;
     }
     this.animator.update(dt, a);
-    this.footIK.update(dt, rig, m.grounded && this.state !== 'dead' && this.state !== 'spawn' && this.state !== 'stagger', Math.hypot(v.x, v.z) < 0.4 ? 0.8 : 0.1);
+    this.footIK.update(dt, rig, m.grounded && this.state !== 'dead' && this.state !== 'spawn' && this.state !== 'stagger' && Math.hypot(v.x, v.z) < 0.6, 1, !m.grounded);
     rig.updateFlash(dt);
     this.weaponSpring.update(dt);
     this.shieldSpring.update(dt);

@@ -139,8 +139,9 @@ export class PlayerView {
     this.animator.update(dt, p.anim);
     // pés se ajustam ao chão (degraus, bordas, rampas) quando apoiado
     const feetOnGround = p.motor.grounded && p.state !== 'dodge' && p.state !== 'dead' && !(p.state === 'attack' && p.attack?.def.spin);
+    // só parado/quase parado: andando/correndo quem manda é a passada animada
     const spd = Math.hypot(p.motor.velocity.x, p.motor.velocity.z);
-    this.footIK.update(dt, rig, feetOnGround, spd < 0.4 ? 0.8 : 0.1);
+    this.footIK.update(dt, rig, feetOnGround && spd < 0.6, 1, !p.motor.grounded);
     rig.root.updateMatrixWorld(true);
 
 
