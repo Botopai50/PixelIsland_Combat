@@ -588,6 +588,14 @@ export class HumanoidAnimator {
         if (s.action === 'charge') {
           P.thighR.z = -0.2; P.thighL.z = 0.2;
           P.spine.x += 0.15;
+          if (s.attackWork === 'chop') {
+            // machado: base baixa, peso na perna de trás (direita), tronco um pouco à frente
+            P.thighR.x += 0.1; P.shinR.x += 0.35;
+            P.thighL.x -= 0.15; P.shinL.x += 0.1;
+            P.spine.x += 0.1;
+            P.pelvis.y += -0.12;
+            bodyYOffset -= 0.05;
+          }
         }
         targetBodyYaw = s.spinYaw;
         break;

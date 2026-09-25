@@ -179,22 +179,19 @@ export class PlayerView {
           // ferramentas: erguidas para trás (machado sobre o ombro, picareta acima
           // da cabeça) — passar do início do arco as fazia atravessar o corpo
           if (def.work === 'mine') angle = 128 + tremble;
-          else if (def.work === 'chop') angle = 118 + tremble;
+          else if (def.work === 'chop') {
+            // machado: puxado para a lateral direita, na horizontal, conforme carrega
+            const ck = clamp01(p.chargeT / T.chargeTime);
+            angle = 72 + 30 * (1 - Math.pow(1 - ck, 2)) + tremble;
+          }
           else angle = def.arc[0] - sgn * 22 + tremble;
         }
         swingDirLocal(def, angle, this.dir, this.edge, p.state === 'attack' ? p.attack?.aimPitch ?? 0 : 0);
-        if (p.state === 'charge' && def.work === 'chop') {
-          // machado carregando: ao lado do corpo, na altura do ombro, apontando
-          // para a direita e só um pouco para trás (nada atrás da cabeça);
-          // gume virado para a frente, pronto para o corte lateral
-          const tr = Math.sin(p.time * 40) * 0.03 * clamp01(p.chargeT / T.chargeTime);
-          this.dir.set(-0.55, 0.8 + tr, 0.12).normalize();
-          this.edge.set(0.35, 0.05, 1).normalize();
-        }
         const { pivot, reach: reach0 } = pivotFor(def);
-        // machado carregando: mãos junto ao ombro direito (não esticadas)
-        const reach = p.state === 'charge' && def.work === 'chop' ? 0.3 : reach0;
+        // machado carregando: mãos junto à lateral direita, na cintura (não esticadas)
+        const reach = p.state === 'charge' && def.work === 'chop' ? 0.34 : reach0;
         this.hand.copy(pivot).addScaledVector(this.dir, reach).applyQuaternion(this.yawQ).add(p.position);
+        if (p.state === 'charge' && def.work === 'chop') this.hand.y -= 0.3;
         this.hand.y += p.motor.visualStepOffset;
         this.dir.applyQuaternion(this.yawQ);
         this.edge.applyQuaternion(this.yawQ);
