@@ -179,10 +179,15 @@ export class HumanoidAnimator {
     // --- quadril e tronco (andar: giro suave do quadril compensado pelo peito)
     P.pelvis.y = hipYaw + sn * bl(0.1, 0.1);
     P.pelvis.z = sn * 0.045 * W;
+    // correr: a cintura também inclina para frente (as coxas saem da pélvis → compensa)
+    const hipTilt = 0.22 * R;
+    P.pelvis.x += hipTilt;
+    P.thighR.x -= hipTilt;
+    P.thighL.x -= hipTilt;
     P.spine.y = -hipYaw * 0.55;
     P.chest.y = -hipYaw * 0.35 - sn * bl(0.14, 0.12);
     P.spine.z = -sn * 0.035 * W;
-    P.spine.x = bl(0.03, 0.62) + (s.exhausted ? 0.25 : 0);
+    P.spine.x = bl(0.03, 0.5) + (s.exhausted ? 0.25 : 0);
     P.chest.x += 0.08 * R;
     P.head.x = -P.spine.x * 0.7;
     // cabeça compensa o giro do tronco (olhar estável, apontando à frente)
