@@ -37,6 +37,9 @@ export class FirstPersonView {
   /** Escudo recolhe para baixo durante o golpe: o arco da lâmina fica legível. */
   private shieldTuck = 0;
   private climbHide = 0;
+  private camInv = new THREE.Matrix4();
+  private cw = new THREE.Vector3();
+  private ce = new THREE.Vector3();
   private bowAim = 0;
   private guardS = new Spring(300, 21);
   private wasGuarding = false;
@@ -320,6 +323,9 @@ export class FirstPersonView {
       }
     }
 
+    // ------------------------------------------------ escalada: mãos na parede
+    if (this.climbHide > 0.02) this.climbArms(p, camera);
+
     // ------------------------------------------------ rastro (espaço da câmera)
     const a = p.attack;
     if (model && a && p.state === 'attack' && main !== 'bow' && (p.swingPhase === 'active' || (p.swingPhase === 'recovery' && p.stateT - a.timing.windup - a.timing.active < Math.max(0.04, (viewmodelStyle(a.def.id).follow ?? 0) * a.timing.recovery * 0.8)))) {
@@ -329,5 +335,62 @@ export class FirstPersonView {
       this.trail.push(base, tip);
     }
     this.trail.update(dt, T.trailsEnabled, a ? 0.5 + a.def.strength * 0.5 : 1);
+  }
+
+  /**
+   * 1ª pessoa escalando: as duas mãos agarram a parede de verdade (posições no
+   * mundo, levadas para o espaço da câmera), alternando a cada braçada; a mão
+   * que sobe desgruda um pouco da parede. Subindo a beirada, as mãos ficam
+   * apoiadas em cima da borda enquanto a câmera passa por cima.
+   */
+  private climbArms(p: PlayerController, camera: THREE.PerspectiveCamera) {
+    for (const [, m] of this.models) m.root.visible = false;
+    this.shield.root.visible = false;
+    const k = this.climbHide;
+    if (k < 0.5 && p.state !== 'climb' && p.state !== 'mantle') {
+      this.armR.visible = this.armL.visible = false;
+      return;
+    }
+    this.camInv.copy(camera.matrixWorld).invert();
+    const n = p.climbN, w = p.climbWall;
+    const fy = Math.atan2(-n.x, -n.z);
+    const rx = -Math.cos(fy), rz = Math.sin(fy);
+    const mantle = p.state === 'mantle';
+    const u = mantle ? p.anim.actionU : 0;
+    const cp = p.climbPhase * Math.PI * 2;
+    const mv = p.climbMove;
+    const jp = p.anim.climbJump ?? 0;
+    const launch = Math.max(0, jp), gather = Math.max(0, -jp);
+    for (const side of [1, -1] as const) {
+      const t = this.cw;
+      if (mantle) {
+        // em cima da borda; no fim (levantando) as mãos saem por baixo
+        t.set(w.x + rx * 0.2 * side - n.x * 0.2, w.y + 0.03, w.z + rz * 0.2 * side - n.z * 0.2);
+        t.y -= Math.max(0, (u - 0.8) / 0.2) * 0.5;
+      } else {
+        const a = Math.sin(cp) * mv * side; // + = esta mão alta
+        const rising = Math.max(0, Math.cos(cp) * side) * mv; // esta mão subindo: desgruda
+        t.set(
+          p.position.x + rx * 0.19 * side, p.position.y + 1.82 + 0.22 * a + 0.3 * launch - 0.12 * gather,
+          p.position.z + rz * 0.19 * side,
+        );
+        // plano da parede (palma encostada), a mão que sobe afasta um pouco
+        const d = (t.x - w.x) * n.x + (t.z - w.z) * n.z;
+        const off = 0.04 + 0.1 * rising;
+        t.x -= n.x * (d - off);
+        t.z -= n.z * (d - off);
+        // passou do topo: agarra a borda por cima
+        if (t.y > w.y - 0.02) {
+          t.y = w.y + 0.02;
+          t.x -= n.x * 0.1;
+          t.z -= n.z * 0.1;
+        }
+      }
+      t.applyMatrix4(this.camInv);
+      // entra/sai de baixo da tela
+      t.y -= (1 - k) * 0.6;
+      const e = this.ce.set(t.x + side * 0.16, t.y - 0.36, t.z + 0.3);
+      this.placeArm(side === 1 ? this.armR : this.armL, t.clone(), side, e);
+    }
   }
 }
