@@ -14,6 +14,11 @@ const REST_WEAPON = new THREE.Quaternion().setFromEuler(new THREE.Euler(1.9, 0, 
 const REST_SHIELD = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, 0));
 const REST_BOW = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2 + 0.3, 0, Math.PI / 2));
 const BACK_SHIELD = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0));
+// guardadas nas costas (fora de combate): empunhadura sobre o ombro direito, lâmina na diagonal
+const SHEATH_WEAPON = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, 0, 3.67));
+const SHEATH_BOW = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, -0.55));
+const SHEATH_OFFSET = new THREE.Vector3(-0.1, 0.12, -0.02);
+const SHIELD_BACK_OFFSET = new THREE.Vector3(0, -0.02, -0.07);
 
 /** Monta a orientação de uma arma a partir da direção da lâmina (+Y) e do gume (+Z). */
 export function weaponBasis(dir: THREE.Vector3, edge: THREE.Vector3, out: THREE.Quaternion) {
@@ -76,6 +81,9 @@ export class PlayerView {
     this.hidden = !v;
   }
   private hidden = false;
+  /** Tempo desde a última ação de combate (arma volta às costas depois de um tempo). */
+  private calmT = 0;
+  sheathed = false;
 
   update(dt: number) {
     const p = this.player;
@@ -106,6 +114,25 @@ export class PlayerView {
 
     this.animator.update(dt, p.anim);
     rig.root.updateMatrixWorld(true);
+
+    // ---------------------------------------------------------------- guardar/sacar (estilo BotW)
+    const combatState = p.state !== 'move' && p.state !== 'equip' && p.state !== 'dodge';
+    let enemyNear = false;
+    for (const t of this.ctx.combat.targets) {
+      if (t.team === 'enemy' && t.alive && t.center(this.v).distanceTo(p.position) < 9) {
+        enemyNear = true;
+        break;
+      }
+    }
+    if (combatState || p.guardAmount > 0.05 || p.lockTarget || enemyNear) this.calmT = 0;
+    else this.calmT += dt;
+    const wantSheath = this.calmT > 2.5;
+    if (wantSheath !== this.sheathed) {
+      this.sheathed = wantSheath;
+      this.equipScale = 0.35;
+      if (p.mainHand) this.ctx.sound.play(wantSheath ? 'unequip' : 'equip', { pos: p.position, vol: 0.5, variant: 'blade' });
+    }
+    const sheathed = this.sheathed;
 
     // ---------------------------------------------------------------- equipamento visível
     const main = p.mainHand;
@@ -154,6 +181,11 @@ export class PlayerView {
         const right = this.v2.set(-Math.cos(yaw), 0, Math.sin(yaw));
         this.pole.addScaledVector(right, 0.5).add(this.v.set(0, -0.6, 0)).addScaledVector(yawToDir(yaw, this.v), -0.3);
         solveTwoBoneIK(rig.joints.upperArmR, rig.joints.forearmR, ARM_UPPER, ARM_FORE, this.hand, this.pole, 1);
+      } else if (sheathed) {
+        // nas costas
+        rig.sockets.back.localToWorld(model.root.position.copy(SHEATH_OFFSET));
+        rig.sockets.back.getWorldQuaternion(this.q);
+        model.root.quaternion.copy(this.q).multiply(SHEATH_WEAPON);
       } else {
         // segue a mão (pose de descanso)
         rig.sockets.handR.getWorldPosition(model.root.position);
@@ -192,6 +224,10 @@ export class PlayerView {
         rig.joints.upperArmR.getWorldPosition(this.pole);
         this.pole.addScaledVector(yawToDir(p.aim.yaw, new THREE.Vector3()), -0.6).y += 0.1;
         solveTwoBoneIK(rig.joints.upperArmR, rig.joints.forearmR, ARM_UPPER, ARM_FORE, stringPos, this.pole, 1);
+      } else if (sheathed) {
+        rig.sockets.back.localToWorld(model.root.position.copy(SHEATH_OFFSET).setX(0.05));
+        rig.sockets.back.getWorldQuaternion(this.q);
+        model.root.quaternion.copy(this.q).multiply(SHEATH_BOW);
       } else {
         rig.sockets.handL.getWorldPosition(model.root.position);
         rig.sockets.handL.getWorldQuaternion(this.q);
@@ -203,8 +239,8 @@ export class PlayerView {
     const sh = this.shield;
     sh.root.visible = !this.hidden && p.offHand === 'shield';
     if (sh.root.visible) {
-      if (main === 'bow') {
-        rig.sockets.back.getWorldPosition(sh.root.position);
+      if (main === 'bow' || sheathed) {
+        rig.sockets.back.localToWorld(sh.root.position.copy(SHIELD_BACK_OFFSET));
         rig.sockets.back.getWorldQuaternion(this.q);
         sh.root.quaternion.copy(this.q).multiply(BACK_SHIELD);
       } else {

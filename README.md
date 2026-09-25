@@ -77,6 +77,7 @@ A interface alterna sozinha entre modo toque e mouse conforme o dispositivo usad
 - **Movimento**: aceleração/frenagem rápidas (sem patinar), inclinação nas curvas, degraus de
   0.2/0.35 m (sobe andando) e 0.6/0.95/1.3 m (precisa pular), rampa, plataformas com vão
   (tolerância de borda e buffer de salto), paredes (colisão e câmera).
+- **Guardar armas (estilo BotW)**: fora de combate (2,5 s sem atacar/defender e sem inimigo a 9 m) a arma e o escudo vão para as costas e os braços balançam livres; qualquer ação de combate saca na hora.
 - **Espada**: combo de 3 golpes (horizontal → diagonal ascendente → golpe final vertical);
   segure para o **Ataque Giratório**; golpe aéreo durante o salto.
 - **Machado**: lento e pesado; é a ferramenta da **árvore** (entalhe aprofunda a cada golpe, a
