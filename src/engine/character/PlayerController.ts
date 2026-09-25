@@ -40,6 +40,8 @@ interface AttackRun {
   hitAny: boolean;
   charged: boolean;
   wallHit: boolean;
+  /** Inclinação do golpe seguindo a mira (rad, + = para cima). */
+  aimPitch: number;
   flurry?: boolean;
   missed?: boolean;
 }
@@ -437,6 +439,7 @@ export class PlayerController implements Damageable {
     this.attack = {
       def, weapon: w, timing: attackTiming(def, T.attackSpeedMul, T.recoveryMul), yaw: this.facing,
       hitSet: new Set(), prevT: 0, swung: false, hitAny: false, charged, wallHit: false,
+      aimPitch: def.spin ? 0 : this.attackAimPitch(),
     };
     this.setState('attack');
     this.buffered = null;
@@ -1148,7 +1151,7 @@ export class PlayerController implements Damageable {
     for (let i = 1; i <= steps; i++) {
       const ts = t0 + ((t1 - t0) * i) / steps;
       const ang = swingAngle(a.def, tm, ts).angle;
-      bladeSegmentWorld(a.def, a.weapon, ang, T.rangeMul, this.position, a.yaw, 1, this.hand, this.base, this.tip, this.bdir, this.edge);
+      bladeSegmentWorld(a.def, a.weapon, ang, T.rangeMul, this.position, a.yaw, 1, this.hand, this.base, this.tip, this.bdir, this.edge, a.aimPitch);
       const hits = this.ctx.combat.querySegment(this.base, this.tip, a.weapon.hitRadius, 'player', a.hitSet);
       for (const h of hits) {
         a.hitSet.add(h.target.id);
@@ -1170,21 +1173,24 @@ export class PlayerController implements Damageable {
         }
         if (T.weaponRecoil) this.recoilImpulse = 0.35 + a.def.strength * 0.8;
       }
-      // lâmina bateu em parede/cenário sólido?
-      const wall = this.ctx.physics.pointInside(this.tip);
-      if (wall && !a.hitAny) {
-        a.wallHit = true;
-        this.ctx.events.emit('wallHit', {
-          pos: this.tip.clone(), dir: this.edge.clone(), normal: this.edge.clone().negate(),
-          material: wall.material, intensity: a.def.strength,
-        });
-        this.bounce();
-        return;
-      }
     }
   }
 
-  /** Arma ricocheteia (parede, escudo de metal, pedra com ferramenta errada). */
+  /**
+   * Altura do golpe pela mira: 1ª pessoa usa o pitch da câmera; 3ª pessoa
+   * desconta a inclinação padrão da câmera (que olha um pouco para baixo);
+   * travado, aponta para o centro do alvo.
+   */
+  private attackAimPitch(): number {
+    let pitch: number;
+    if (this.lockTarget) {
+      this.lockTarget.center(this.tmp).sub(this.position);
+      pitch = Math.atan2(this.tmp.y - 1.3, Math.max(0.8, Math.hypot(this.tmp.x, this.tmp.z)));
+    } else pitch = this.aim.firstPerson ? this.aim.pitch : this.aim.pitch + 0.15;
+    return clamp(pitch, -0.7, 0.9);
+  }
+
+  /** Arma ricocheteia (escudo de metal, pedra com ferramenta errada). */
   private bounce() {
     if (this.ctx.tuning.weaponRecoil) this.recoilImpulse = 1.4;
     if (this.attack) this.attack.wallHit = true;
@@ -1284,7 +1290,7 @@ export class PlayerController implements Damageable {
   /** Pose lógica da arma no golpe atual (para views). */
   swingPose(outDirLocal: THREE.Vector3, outEdgeLocal: THREE.Vector3): AttackDef | null {
     if (this.state === 'attack' && this.attack) {
-      swingDirLocal(this.attack.def, this.swingAngle, outDirLocal, outEdgeLocal);
+      swingDirLocal(this.attack.def, this.swingAngle, outDirLocal, outEdgeLocal, this.attack.aimPitch);
       return this.attack.def;
     }
     return null;

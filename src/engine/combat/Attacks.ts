@@ -161,7 +161,11 @@ const U = new THREE.Vector3(0, 1, 0);
  * Direção da lâmina no espaço LOCAL do personagem (frente +Z, direita -X).
  * Também devolve a direção do "gume" (tangente do movimento).
  */
-export function swingDirLocal(def: AttackDef, angleDeg: number, outDir: THREE.Vector3, outEdge: THREE.Vector3) {
+/**
+ * @param aimPitch inclinação extra do plano do golpe (rad, + = para cima), para
+ * o golpe seguir a altura da mira.
+ */
+export function swingDirLocal(def: AttackDef, angleDeg: number, outDir: THREE.Vector3, outEdge: THREE.Vector3, aimPitch = 0) {
   const th = angleDeg * DEG;
   const roll = def.roll * DEG;
   // eixo "lateral" do plano de golpe, inclinado pelo roll
@@ -172,6 +176,12 @@ export function swingDirLocal(def: AttackDef, angleDeg: number, outDir: THREE.Ve
   if (def.pitch) {
     // inclina o plano para baixo ao redor do eixo lateral do personagem
     _q.setFromAxisAngle(R, def.pitch * DEG);
+    outDir.applyQuaternion(_q);
+    outEdge.applyQuaternion(_q);
+  }
+  if (aimPitch) {
+    // mesmo eixo lateral: + levanta o golpe
+    _q.setFromAxisAngle(R, aimPitch);
     outDir.applyQuaternion(_q);
     outEdge.applyQuaternion(_q);
   }
@@ -201,8 +211,9 @@ export function bladeSegmentWorld(
   def: AttackDef, weapon: WeaponDef, angleDeg: number, rangeMul: number,
   feet: THREE.Vector3, yaw: number, scale: number,
   outHand: THREE.Vector3, outBase: THREE.Vector3, outTip: THREE.Vector3, outDir: THREE.Vector3, outEdge: THREE.Vector3,
+  aimPitch = 0,
 ) {
-  swingDirLocal(def, angleDeg, outDir, outEdge);
+  swingDirLocal(def, angleDeg, outDir, outEdge, aimPitch);
   const { pivot, reach } = pivotFor(def);
   outHand.copy(pivot).multiplyScalar(scale).addScaledVector(outDir, reach * scale);
   _q.setFromAxisAngle(U, yaw);

@@ -171,7 +171,7 @@ export class PlayerView {
           const sgn = Math.sign(def.arc[1] - def.arc[0]) || 1;
           angle = def.arc[0] - sgn * 22 + Math.sin(p.time * 40) * 2 * clamp01(p.chargeT / T.chargeTime);
         }
-        swingDirLocal(def, angle, this.dir, this.edge);
+        swingDirLocal(def, angle, this.dir, this.edge, p.state === 'attack' ? p.attack?.aimPitch ?? 0 : 0);
         const { pivot, reach } = pivotFor(def);
         this.hand.copy(pivot).addScaledVector(this.dir, reach).applyQuaternion(this.yawQ).add(p.position);
         this.hand.y += p.motor.visualStepOffset;

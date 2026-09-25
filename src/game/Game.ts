@@ -273,7 +273,7 @@ export class Game {
     const a = this.player.attack;
     if (ctx.tuning.showHitboxes && a && this.player.state === 'attack') {
       const h = new THREE.Vector3(), b = new THREE.Vector3(), t = new THREE.Vector3(), d = new THREE.Vector3(), e = new THREE.Vector3();
-      bladeSegmentWorld(a.def, a.weapon, this.player.swingAngle, ctx.tuning.rangeMul, this.player.position, a.yaw, 1, h, b, t, d, e);
+      bladeSegmentWorld(a.def, a.weapon, this.player.swingAngle, ctx.tuning.rangeMul, this.player.position, a.yaw, 1, h, b, t, d, e, a.aimPitch);
       blades.push({ base: b, tip: t });
     }
     this.debug.update(ctx.tuning.showHitboxes, ctx.combat, blades);
