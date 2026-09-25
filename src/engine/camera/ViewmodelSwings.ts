@@ -30,12 +30,12 @@ interface Style {
 // Golpes EXAGERADOS: a preparação e a continuação podem sair do quadro por
 // alguns frames — o que importa é o arco grande passando pelo centro.
 const S: Record<string, Style> = {
-  // da direita para a esquerda: lâmina por cima do ombro direito → varre → sai embaixo à esquerda
+  // da direita para a esquerda, LATERAL: lâmina deitada à direita → varre na horizontal → sai à esquerda
   slashRL: {
-    W: { p: [0.42, 0.04, -0.4], d: [0.5, 0.75, -0.1] },
-    M: { p: [0.02, -0.1, -0.64], d: [-0.86, 0.08, -0.5] },
-    F: { p: [-0.46, -0.26, -0.4], d: [-0.7, -0.4, -0.3] },
-    camW: [0.03, -0.07, -0.07], camF: [-0.04, 0.1, 0.1],
+    W: { p: [0.44, -0.06, -0.4], d: [0.92, 0.18, 0.2] },
+    M: { p: [0.02, -0.1, -0.64], d: [-0.86, 0.06, -0.5] },
+    F: { p: [-0.46, -0.14, -0.4], d: [-0.92, 0.0, 0.25] },
+    camW: [0.01, -0.1, -0.03], camF: [-0.01, 0.13, 0.04],
     hold: 0.2,
   },
   // subindo da esquerda para a direita
@@ -62,12 +62,12 @@ const S: Record<string, Style> = {
     camW: [0, -0.14, -0.06], camF: [0, 0.22, 0.08],
     hold: 0.1,
   },
-  // machado: ergue bem atrás à direita, corta de lado e PARA cravado no alvo
+  // machado: golpe LATERAL — lâmina deitada atrás à direita, varre na horizontal e PARA cravada no alvo
   chop: {
-    W: { p: [0.4, 0.06, -0.38], d: [0.55, 0.78, 0.0] },
-    M: { p: [0.12, -0.18, -0.56], d: [-0.55, 0.22, -0.8] },
-    F: { p: [-0.08, -0.26, -0.58], d: [-0.8, 0.1, -0.6] },
-    camW: [0.05, -0.08, -0.06], camF: [-0.06, 0.06, 0.05],
+    W: { p: [0.42, -0.12, -0.38], d: [0.92, 0.2, 0.2] },
+    M: { p: [0.12, -0.17, -0.56], d: [-0.6, 0.12, -0.8] },
+    F: { p: [-0.06, -0.19, -0.58], d: [-0.86, 0.06, -0.5] },
+    camW: [0, -0.1, -0.03], camF: [0, 0.07, 0.03],
     hold: 0.4,
     twoHanded: true,
   },
@@ -149,6 +149,16 @@ export function viewmodelSwingPose(
   const cur = { p: outP, q: outQ };
   const { seg, k } = track(style, phase, u);
   const [A, B] = seg === 0 ? [null, style.W] : seg === 1 ? [style.W, style.M] : seg === 2 ? [style.M, style.F] : [style.F, null];
+  if (A && B) {
+    // entre poses-chave: interpola a DIREÇÃO da lâmina (arco plano, como um
+    // golpe de verdade) em vez do caminho mais curto da rotação, que em arcos
+    // grandes passava por cima da cabeça
+    outP.set(...A.p).lerp(vc.set(...B.p), k);
+    va.set(...A.d).normalize().lerp(vb.set(...B.d).normalize(), k);
+    vc.set(...(A.e as V3)).normalize().lerp(vb.set(...(B.e as V3)).normalize(), k);
+    weaponBasis(va, vc, outQ);
+    return;
+  }
   if (A) { outP.set(...A.p); keyQuat(A, outQ); } else { outP.copy(restP); outQ.copy(restQ); }
   if (B) blend(cur, vc.set(...B.p), keyQuat(B, qb), k);
   else if (k > 0) blend(cur, restP, restQ, k);
