@@ -155,7 +155,7 @@ export class Enemy implements Damageable, Threat {
   }
 
   center(out: THREE.Vector3) {
-    return out.copy(this.motor.position).setY(this.motor.position.y + 1.1);
+    return out.copy(this.motor.position).setY(this.motor.position.y + 1.3 * this.rig.style.scale);
   }
 
   private setState(s: EnemyState, dur = 0) {

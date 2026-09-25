@@ -95,7 +95,9 @@ export class CameraRig implements AimSource {
       const dist = Math.hypot(this.tmp.x, this.tmp.z);
       // 1ª pessoa: mira no peito do alvo a partir da altura do OLHO (a mira central cai no alvo).
       // 3ª pessoa: enquadra de cima, com o alvo um pouco abaixo do centro.
-      const firstP = Math.atan2(this.tmp.y - 0.15 - EYE.y, Math.max(0.5, dist - EYE.z));
+      // mira exatamente no ponto da retícula, medido da posição real da câmera (olho)
+      p.lockTarget.center(this.tmp2).sub(this.camera.position);
+      const firstP = Math.atan2(this.tmp2.y, Math.max(0.3, Math.hypot(this.tmp2.x, this.tmp2.z)));
       const thirdP = Math.atan2(this.tmp.y - 0.6, dist) - 0.18;
       const wantPitch = this.blend > 0.5 ? firstP : thirdP;
       this.pitch = damp(this.pitch, wantPitch, this.blend > 0.5 ? 10 : 4, realDt);

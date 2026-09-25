@@ -83,7 +83,7 @@ export class TrainingDummy implements Damageable {
   }
 
   center(out: THREE.Vector3) {
-    return out.copy(this.pos).setY(this.pos.y + 1.3);
+    return out.copy(this.pos).setY(this.pos.y + 1.4);
   }
 
   private updateHurtboxes() {
