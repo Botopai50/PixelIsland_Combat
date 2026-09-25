@@ -34,6 +34,13 @@ export interface AnimInput {
   actionU: number;
   /** Para ataques: giro do tronco (rad) e se é giratório. */
   attackTwist: number;
+  /** Corpo no golpe: >0 comprometido no corte, <0 antecipação (peso atrás). */
+  attackBody?: number;
+  /** Direção lateral do corte (-1 = para a esquerda, 1 = para a direita). */
+  attackSide?: number;
+  /** Intensidade do corpo inteiro (0 = só tronco). */
+  attackMotion?: number;
+  attackOverhead?: boolean;
   spinYaw: number;
   crouch: number;
   dodgeType: DodgeType;
@@ -260,14 +267,41 @@ export class HumanoidAnimator {
       case 'charge': {
         snappy = true;
         P.chest.y += s.attackTwist;
-        P.spine.y += s.attackTwist * 0.5;
-        P.pelvis.y += s.attackTwist * 0.25;
+        P.spine.y += s.attackTwist * 0.6;
+        P.pelvis.y += s.attackTwist * 0.45;
         P.spine.x += 0.12;
         // base firme: pernas abertas
         P.thighR.x = lerp(P.thighR.x, 0.35, 0.6);
         P.thighL.x = lerp(P.thighL.x, -0.45, 0.6);
         P.shinR.x = lerp(P.shinR.x, 0.35, 0.6);
         P.shinL.x = lerp(P.shinL.x, 0.3, 0.6);
+        // ---- corpo inteiro no golpe (espada)
+        const M = s.attackMotion ?? 0;
+        if (M > 0) {
+          const k = s.attackBody ?? 0; // -1..1
+          const commit = Math.max(0, k), antic = Math.max(0, -k);
+          const side = s.attackSide ?? 0;
+          const ov = s.attackOverhead ? 1 : 0;
+          // antecipação: peso para trás, tronco recua (e sobe no golpe vertical)
+          P.spine.x += (-0.3 * antic - 0.25 * antic * ov + 0.42 * commit + 0.3 * commit * ov) * M;
+          P.chest.x += (-0.12 * antic + 0.15 * commit) * M;
+          P.head.x += (0.1 * antic - 0.25 * commit) * M;
+          // passo: perna esquerda avança e dobra; perna de trás estica e empurra
+          P.thighL.x += (-0.55 * commit + 0.25 * antic) * M;
+          P.shinL.x += (0.55 * commit) * M;
+          P.thighR.x += (0.5 * commit - 0.2 * antic) * M;
+          P.shinR.x += (0.25 * commit + 0.3 * antic) * M;
+          P.footR.x += 0.35 * commit * M;
+          // inclina na direção do corte
+          targetBodyRotZ += side * 0.22 * commit * M;
+          P.spine.z += side * 0.12 * commit * M;
+          // braço do escudo contrabalança
+          P.upperArmL.z += (0.35 * commit + 0.15 * antic) * M;
+          P.upperArmL.x += (0.45 * commit - 0.3 * antic) * M;
+          P.forearmL.x -= 0.5 * commit * M;
+          // agacha no impacto; no vertical, pulinho na preparação
+          bodyYOffset += (-0.16 * commit - 0.12 * commit * ov + 0.1 * antic * ov) * M;
+        }
         if (s.action === 'charge') {
           P.thighR.z = -0.2; P.thighL.z = 0.2;
           P.spine.x += 0.15;

@@ -44,6 +44,13 @@ export interface AttackDef {
   bodyTwist: number;
   /** Golpe giratório: o corpo inteiro gira junto. */
   spin?: boolean;
+  /**
+   * Quanto o CORPO participa do golpe (0 = só braço/tronco; 1 = corpo inteiro:
+   * antecipação, passo à frente, inclinação no corte, agachamento no impacto).
+   */
+  bodyMotion?: number;
+  /** Golpe vertical com pulinho na preparação e descida com o peso todo. */
+  overhead?: boolean;
   label: string;
 }
 
@@ -73,23 +80,23 @@ const A = (d: Partial<AttackDef> & Pick<AttackDef, 'id' | 'label'>): AttackDef =
 
 export const ATTACKS: Record<string, AttackDef> = {
   // --------------------------------------------------------- espada: rápida, combo de 3
-  sword1: A({ id: 'sword1', label: 'Corte 1', windup: 0.09, active: 0.09, recovery: 0.26, damage: 12, strength: 0.28, knockback: 2.5, hitStop: 0.045, shake: 0.12, arc: [80, -85], roll: -8, pitch: 12, lunge: 2.6, cancelAt: 0, cancelWindup: true, chainAt: 0.0, next: 'sword2', whoosh: 0.3 }),
-  sword2: A({ id: 'sword2', label: 'Corte 2', windup: 0.08, active: 0.09, recovery: 0.28, damage: 12, strength: 0.32, knockback: 2.8, hitStop: 0.05, shake: 0.14, arc: [-85, 75], roll: 38, pitch: 8, lunge: 2.6, cancelAt: 0, cancelWindup: true, chainAt: 0.0, next: 'sword3', whoosh: 0.35 }),
-  sword3: A({ id: 'sword3', label: 'Golpe Final', windup: 0.16, active: 0.1, recovery: 0.42, damage: 22, strength: 0.65, knockback: 6, hitStop: 0.085, shake: 0.3, arc: [120, -30], roll: 90, pitch: 0, lunge: 4.5, cancelAt: 0.14, cancelWindup: false, chainAt: 0.3, whoosh: 0.6, bodyTwist: 0.25 }),
+  sword1: A({ id: 'sword1', label: 'Corte 1', windup: 0.09, active: 0.09, recovery: 0.26, damage: 12, strength: 0.28, knockback: 2.5, hitStop: 0.045, shake: 0.12, arc: [80, -85], roll: -8, pitch: 12, lunge: 2.6, cancelAt: 0, cancelWindup: true, chainAt: 0.0, next: 'sword2', whoosh: 0.3, bodyTwist: 0.75, bodyMotion: 1 }),
+  sword2: A({ id: 'sword2', label: 'Corte 2', windup: 0.08, active: 0.09, recovery: 0.28, damage: 12, strength: 0.32, knockback: 2.8, hitStop: 0.05, shake: 0.14, arc: [-85, 75], roll: 38, pitch: 8, lunge: 2.6, cancelAt: 0, cancelWindup: true, chainAt: 0.0, next: 'sword3', whoosh: 0.35, bodyTwist: 0.75, bodyMotion: 1 }),
+  sword3: A({ id: 'sword3', label: 'Golpe Final', windup: 0.16, active: 0.1, recovery: 0.42, damage: 22, strength: 0.65, knockback: 6, hitStop: 0.085, shake: 0.3, arc: [120, -30], roll: 90, pitch: 0, lunge: 4.5, cancelAt: 0.14, cancelWindup: false, chainAt: 0.3, whoosh: 0.6, bodyTwist: 0.25, bodyMotion: 1.2, overhead: true }),
   swordSpin: A({ id: 'swordSpin', label: 'Ataque Giratório', windup: 0.05, active: 0.42, recovery: 0.36, damage: 28, strength: 0.85, knockback: 7, hitStop: 0.1, shake: 0.4, arc: [100, -460], roll: 0, pitch: 6, pivot: 'center', lunge: 0, cancelAt: 0.2, whoosh: 0.9, spin: true, stamina: 25 }),
-  swordAir: A({ id: 'swordAir', label: 'Corte Aéreo', windup: 0.07, active: 0.11, recovery: 0.22, damage: 15, strength: 0.5, knockback: 4, hitStop: 0.06, shake: 0.2, arc: [125, -45], roll: 90, pitch: 0, lunge: 0, cancelAt: 0.1, whoosh: 0.5 }),
-  flurryA: A({ id: 'flurryA', label: 'Rajada', windup: 0.02, active: 0.06, recovery: 0.03, damage: 8, strength: 0.35, knockback: 1, hitStop: 0.03, shake: 0.12, arc: [80, -80], roll: 20, pitch: 10, lunge: 0, whoosh: 0.35 }),
-  flurryB: A({ id: 'flurryB', label: 'Rajada', windup: 0.02, active: 0.06, recovery: 0.03, damage: 8, strength: 0.35, knockback: 1, hitStop: 0.03, shake: 0.12, arc: [-80, 80], roll: -25, pitch: 10, lunge: 0, whoosh: 0.35 }),
+  swordAir: A({ id: 'swordAir', label: 'Corte Aéreo', windup: 0.07, active: 0.11, recovery: 0.22, damage: 15, strength: 0.5, knockback: 4, hitStop: 0.06, shake: 0.2, arc: [125, -45], roll: 90, pitch: 0, lunge: 0, cancelAt: 0.1, whoosh: 0.5, bodyMotion: 0.6 }),
+  flurryA: A({ id: 'flurryA', label: 'Rajada', windup: 0.02, active: 0.06, recovery: 0.03, damage: 8, strength: 0.35, knockback: 1, hitStop: 0.03, shake: 0.12, arc: [80, -80], roll: 20, pitch: 10, lunge: 0, whoosh: 0.35, bodyTwist: 0.6, bodyMotion: 0.8 }),
+  flurryB: A({ id: 'flurryB', label: 'Rajada', windup: 0.02, active: 0.06, recovery: 0.03, damage: 8, strength: 0.35, knockback: 1, hitStop: 0.03, shake: 0.12, arc: [-80, 80], roll: -25, pitch: 10, lunge: 0, whoosh: 0.35, bodyTwist: 0.6, bodyMotion: 0.8 }),
 
   // --------------------------------------------------------- machado: lento, pesado
-  axe1: A({ id: 'axe1', label: 'Machadada', windup: 0.2, active: 0.11, recovery: 0.4, damage: 17, strength: 0.55, knockback: 4.5, hitStop: 0.075, shake: 0.24, arc: [100, -55], roll: -10, pitch: 12, lunge: 2, cancelAt: 0.14, chainAt: 0.1, next: 'axe2', whoosh: 0.6 }),
-  axe2: A({ id: 'axe2', label: 'Revés', windup: 0.18, active: 0.11, recovery: 0.44, damage: 17, strength: 0.55, knockback: 4.5, hitStop: 0.075, shake: 0.24, arc: [-100, 55], roll: 12, pitch: 12, lunge: 2, cancelAt: 0.14, chainAt: 0.12, next: 'axe1', whoosh: 0.6 }),
-  axeCharged: A({ id: 'axeCharged', label: 'Machadada Carregada', windup: 0.07, active: 0.13, recovery: 0.6, damage: 45, strength: 1, knockback: 9, hitStop: 0.15, shake: 0.62, arc: [140, -40], roll: 90, pitch: 0, lunge: 3.5, cancelAt: 0.3, whoosh: 1, bodyTwist: 0.2, stamina: 25 }),
+  axe1: A({ id: 'axe1', label: 'Machadada', windup: 0.2, active: 0.11, recovery: 0.4, damage: 17, strength: 0.55, knockback: 4.5, hitStop: 0.075, shake: 0.24, arc: [100, -55], roll: -10, pitch: 12, lunge: 0, cancelAt: 0.14, chainAt: 0.1, next: 'axe2', whoosh: 0.6 }),
+  axe2: A({ id: 'axe2', label: 'Revés', windup: 0.18, active: 0.11, recovery: 0.44, damage: 17, strength: 0.55, knockback: 4.5, hitStop: 0.075, shake: 0.24, arc: [-100, 55], roll: 12, pitch: 12, lunge: 0, cancelAt: 0.14, chainAt: 0.12, next: 'axe1', whoosh: 0.6 }),
+  axeCharged: A({ id: 'axeCharged', label: 'Machadada Carregada', windup: 0.07, active: 0.13, recovery: 0.6, damage: 45, strength: 1, knockback: 9, hitStop: 0.15, shake: 0.62, arc: [140, -40], roll: 90, pitch: 0, lunge: 0, cancelAt: 0.3, whoosh: 1, bodyTwist: 0.2, stamina: 25 }),
 
   // --------------------------------------------------------- picareta: golpes verticais
-  pick1: A({ id: 'pick1', label: 'Picaretada', windup: 0.22, active: 0.11, recovery: 0.42, damage: 14, strength: 0.55, knockback: 3, hitStop: 0.075, shake: 0.22, arc: [125, -50], roll: 90, pitch: 0, lunge: 1.5, cancelAt: 0.14, chainAt: 0.1, next: 'pick2', whoosh: 0.55, bodyTwist: 0.15 }),
-  pick2: A({ id: 'pick2', label: 'Picaretada', windup: 0.2, active: 0.11, recovery: 0.44, damage: 14, strength: 0.55, knockback: 3, hitStop: 0.075, shake: 0.22, arc: [125, -50], roll: 68, pitch: 0, lunge: 1.5, cancelAt: 0.14, chainAt: 0.1, next: 'pick1', whoosh: 0.55, bodyTwist: 0.2 }),
-  pickCharged: A({ id: 'pickCharged', label: 'Picaretada Carregada', windup: 0.07, active: 0.12, recovery: 0.55, damage: 38, strength: 0.95, knockback: 6, hitStop: 0.13, shake: 0.55, arc: [140, -50], roll: 90, pitch: 0, lunge: 3, cancelAt: 0.3, whoosh: 0.95, bodyTwist: 0.15, stamina: 25 }),
+  pick1: A({ id: 'pick1', label: 'Picaretada', windup: 0.22, active: 0.11, recovery: 0.42, damage: 14, strength: 0.55, knockback: 3, hitStop: 0.075, shake: 0.22, arc: [125, -50], roll: 90, pitch: 0, lunge: 0, cancelAt: 0.14, chainAt: 0.1, next: 'pick2', whoosh: 0.55, bodyTwist: 0.15 }),
+  pick2: A({ id: 'pick2', label: 'Picaretada', windup: 0.2, active: 0.11, recovery: 0.44, damage: 14, strength: 0.55, knockback: 3, hitStop: 0.075, shake: 0.22, arc: [125, -50], roll: 68, pitch: 0, lunge: 0, cancelAt: 0.14, chainAt: 0.1, next: 'pick1', whoosh: 0.55, bodyTwist: 0.2 }),
+  pickCharged: A({ id: 'pickCharged', label: 'Picaretada Carregada', windup: 0.07, active: 0.12, recovery: 0.55, damage: 38, strength: 0.95, knockback: 6, hitStop: 0.13, shake: 0.55, arc: [140, -50], roll: 90, pitch: 0, lunge: 0, cancelAt: 0.3, whoosh: 0.95, bodyTwist: 0.15, stamina: 25 }),
 
   // --------------------------------------------------------- clava (inimigo): preparação longa e legível
   club1: A({ id: 'club1', label: 'Clava', windup: 0.55, active: 0.14, recovery: 0.6, damage: 18, strength: 0.6, knockback: 6, hitStop: 0.08, shake: 0.35, arc: [125, -35], roll: 70, pitch: 0, lunge: 3.2, whoosh: 0.7 }),

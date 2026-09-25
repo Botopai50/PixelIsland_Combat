@@ -133,6 +133,7 @@ export class PlayerController implements Damageable {
   /** Ângulo atual do golpe (para views). */
   swingAngle = 0;
   swingPhase: 'windup' | 'active' | 'recovery' | 'done' = 'done';
+  swingU = 0;
   /** Impulso visual de recuo da arma (views leem e zeram). */
   recoilImpulse = 0;
   /** Recuo do escudo (views). */
@@ -1096,6 +1097,7 @@ export class PlayerController implements Damageable {
     const sa = swingAngle(a.def, tm, t);
     this.swingAngle = sa.angle;
     this.swingPhase = sa.phase;
+    this.swingU = sa.u;
 
     // som do golpe sincronizado com o início da janela ativa
     if (!a.swung && t >= tm.windup) {
@@ -1181,6 +1183,7 @@ export class PlayerController implements Damageable {
     s.aimPitch = this.aim.pitch;
     s.crouch = damp(s.crouch, this.state === 'charge' ? 0.55 : this.guarding ? 0.25 : 0, 12, dt);
     s.attackTwist = 0;
+    s.attackMotion = 0;
     s.spinYaw = 0;
     const map: Record<PlayerState, AnimAction> = {
       move: 'none', attack: 'attack', charge: 'charge', dodge: 'dodge', bow: 'bow', bowRecover: 'bow',
@@ -1194,6 +1197,16 @@ export class PlayerController implements Damageable {
         const a = this.attack!;
         s.actionU = clamp01(this.stateT / a.timing.total);
         s.attackTwist = -(this.swingAngle * Math.PI / 180) * a.def.bodyTwist * 0.6;
+        // curva do corpo: antecipação (−) na preparação → comprometimento (+) no golpe → volta
+        const u = this.swingU;
+        let k: number;
+        if (this.swingPhase === 'windup') k = -0.9 * (1 - (1 - u) * (1 - u));
+        else if (this.swingPhase === 'active') k = -0.9 + 1.9 * (1 - (1 - u) * (1 - u));
+        else k = 1 - u * u * (3 - 2 * u);
+        s.attackBody = k;
+        s.attackSide = Math.sign(a.def.arc[1] - a.def.arc[0]) * (a.def.roll > 60 ? 0 : 1);
+        s.attackMotion = a.def.bodyMotion ?? 0;
+        s.attackOverhead = !!a.def.overhead;
         if (a.def.spin) {
           const ang = this.swingAngle;
           s.spinYaw = ((60 - ang) * Math.PI) / 180;
@@ -1202,6 +1215,7 @@ export class PlayerController implements Damageable {
         break;
       }
       case 'charge':
+        s.attackMotion = 0;
         s.actionU = clamp01(this.chargeT / this.ctx.tuning.chargeTime);
         s.attackTwist = 0.5;
         break;
