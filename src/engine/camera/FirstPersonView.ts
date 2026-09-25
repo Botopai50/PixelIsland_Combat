@@ -376,9 +376,18 @@ export class FirstPersonView {
       } else {
         const a = Math.sin(cp) * mv * side; // + = esta mão alta
         const rising = Math.max(0, Math.cos(cp) * side) * mv; // esta mão subindo: desgruda
+        // direção: descendo → mãos mais baixas (a de baixo desce procurando apoio);
+        // para os lados → a mão do lado do movimento estica para lá, a outra junta
+        const dx = p.climbDir.x, dy = p.climbDir.y;
+        const wDown = Math.max(0, -dy) * mv, wSide = Math.abs(dx) * mv;
+        const lead = Math.sign(dx) === side ? 1 : 0;
+        const reach = 0.5 + 0.5 * Math.sin(cp);
+        const sideOff = wSide * (lead ? 0.26 * reach : -0.1 * (1 - reach));
+        const vertA = a * (1 - 0.7 * wSide); // de lado as mãos ficam na mesma altura
         t.set(
-          p.position.x + rx * 0.19 * side, p.position.y + 1.82 + 0.22 * a + 0.3 * launch - 0.12 * gather,
-          p.position.z + rz * 0.19 * side,
+          p.position.x + rx * (0.19 + sideOff) * side,
+          p.position.y + 1.82 + 0.22 * vertA + 0.3 * launch - 0.12 * gather - 0.32 * wDown - 0.05 * wSide,
+          p.position.z + rz * (0.19 + sideOff) * side,
         );
         // plano da parede (palma encostada), a mão que sobe afasta um pouco
         const d = (t.x - w.x) * n.x + (t.z - w.z) * n.z;

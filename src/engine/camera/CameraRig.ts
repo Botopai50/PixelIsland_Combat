@@ -262,12 +262,15 @@ export class CameraRig implements AimSource {
     const swPitch = (Math.abs(Math.cos(ph)) - 0.64) * lerp(0.014, 0.006, b) * sw;
     const swYaw = Math.sin(ph) * lerp(0.004, 0.002, b) * sw;
     // 1ª pessoa escalando: cabeça acompanha as braçadas (rola de leve para o lado da mão que puxa)
-    const climbRoll = p.state === 'climb' ? Math.sin(p.climbPhase * Math.PI * 2) * p.climbMove * 0.035 * b : 0;
+    const climbRoll = p.state === 'climb' ? (Math.sin(p.climbPhase * Math.PI * 2) * p.climbMove * 0.035 - p.climbDir.x * p.climbMove * 0.05) * b : 0;
+    // 1ª pessoa escalando: olha para onde vai (para baixo ao descer, para o lado ao ir de lado)
+    const climbLookP = p.state === 'climb' ? -Math.max(0, -p.climbDir.y) * p.climbMove * 0.45 * b : 0;
+    const climbLookY = p.state === 'climb' ? -p.climbDir.x * p.climbMove * 0.3 * b : 0;
     // 1ª pessoa subindo a beirada: a cabeça olha para a borda/mãos e depois volta
     const mantlePitch = p.state === 'mantle' ? -0.5 * Math.sin(clamp01(p.anim.actionU / 0.85) * Math.PI) * b : 0;
     // soma de todos os efeitos nunca passa da vertical (senão a câmera vira e olha para trás)
-    const finalPitch = clamp(this.pitch + sh.rot.x + this.leanSm.x + J.rot.x + swPitch + mantlePitch, -1.5, 1.5);
-    cam.rotation.set(finalPitch, this.yaw + Math.PI + sh.rot.y + this.leanSm.y + J.rot.y + swYaw, sh.rot.z + roll + this.leanSm.z + J.rot.z + swRoll + climbRoll, 'YXZ');
+    const finalPitch = clamp(this.pitch + sh.rot.x + this.leanSm.x + J.rot.x + swPitch + mantlePitch + climbLookP, -1.5, 1.5);
+    cam.rotation.set(finalPitch, this.yaw + Math.PI + sh.rot.y + this.leanSm.y + J.rot.y + swYaw + climbLookY, sh.rot.z + roll + this.leanSm.z + J.rot.z + swRoll + climbRoll, 'YXZ');
     cam.updateMatrixWorld();
     // deslocamento do tremor em espaço de câmera
     this.tmp.set(sh.offset.x, sh.offset.y, 0).applyQuaternion(cam.quaternion);
