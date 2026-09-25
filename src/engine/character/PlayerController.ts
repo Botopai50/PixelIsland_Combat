@@ -27,7 +27,8 @@ export interface AimSource {
 }
 
 export type PlayerState =
-  | 'move' | 'attack' | 'charge' | 'dodge' | 'bow' | 'bowRecover' | 'equip' | 'hurt' | 'stagger' | 'guardHit' | 'dead';
+  | 'move' | 'attack' | 'charge' | 'dodge' | 'bow' | 'bowRecover' | 'equip' | 'hurt' | 'stagger' | 'guardHit' | 'dead'
+  | 'climb' | 'mantle';
 
 interface AttackRun {
   def: AttackDef;
@@ -112,6 +113,21 @@ export class PlayerController implements Damageable {
   sneaking = false;
   /** 0..1 suavizado (câmera, sons). */
   sneakAmount = 0;
+  // ---- escalada (estilo BotW)
+  /** Normal da parede sendo escalada (aponta para fora). */
+  readonly climbN = new THREE.Vector3();
+  /** Fase do ciclo de escalada (braços/pernas alternando). */
+  climbPhase = 0;
+  /** 0..1: quanto está se movendo na parede. */
+  climbMove = 0;
+  /** Salto na parede (tempo restante). */
+  climbJumpT = 0;
+  private climbJumpDir = new THREE.Vector2();
+  private climbTop = 0;
+  private climbPushT = 0;
+  private mantleFrom = new THREE.Vector3();
+  private mantleTo = new THREE.Vector3();
+  private mantleDur = 0.5;
   private guardPressAt = -10;
 
   // esquiva
@@ -393,6 +409,195 @@ export class PlayerController implements Damageable {
       case 'guardHit': return 0.25 - this.stateT;
       case 'stagger': return 0.35 - this.stateT;
       default: return 0;
+    }
+  }
+
+  // ------------------------------------------------------------------ escalada
+  /**
+   * Andando contra uma parede: beirada baixa → sobe direto; beirada ao alcance
+   * no ar → agarra e sobe; parede alta → gruda e escala (como no BotW).
+   */
+  private tryClimb(dt: number, mag: number, inYaw: number) {
+    const m = this.motor;
+    if (mag < 0.5 || this.lockTarget) {
+      this.climbPushT = 0;
+      return;
+    }
+    const dx = Math.sin(inYaw), dz = Math.cos(inYaw);
+    const reach = m.radius + 0.3;
+    const W = this.ctx.physics;
+    const p = this.position;
+    const hit = W.probeWall(p.x, p.z, p.y + 1.1, dx, dz, reach) ?? W.probeWall(p.x, p.z, p.y + 0.5, dx, dz, reach);
+    // precisa estar indo DE ENCONTRO à parede
+    if (!hit || dx * -hit.nx + dz * -hit.nz < 0.6) {
+      this.climbPushT = 0;
+      return;
+    }
+    const h = hit.top - p.y;
+    if (h <= m.stepUp + 0.02) return;
+    this.climbPushT += dt;
+    const air = !m.grounded;
+    if (h <= 1.25) {
+      // beirada baixa: sobe andando (no ar, na hora)
+      if (air || this.climbPushT > 0.12) this.startMantle(hit.x, hit.z, hit.nx, hit.nz, hit.top);
+    } else if (air && h <= 2.15) {
+      // beirada ao alcance das mãos no pulo: agarra e sobe
+      this.startMantle(hit.x, hit.z, hit.nx, hit.nz, hit.top);
+    } else if (!this.exhausted && this.stamina > 1 && (air || this.climbPushT > 0.2)) {
+      this.startClimb(hit.x, hit.z, hit.nx, hit.nz, hit.top);
+    }
+  }
+
+  private faceWall(nx: number, nz: number) {
+    this.facing = dirToYaw(-nx, -nz);
+  }
+
+  private startClimb(x: number, z: number, nx: number, nz: number, top: number) {
+    this.cancelActions();
+    this.guarding = false;
+    this.sneaking = false;
+    this.climbN.set(nx, 0, nz).normalize();
+    this.climbTop = top;
+    this.climbJumpT = 0;
+    const r = this.motor.radius * 0.85;
+    this.position.x = x + nx * r;
+    this.position.z = z + nz * r;
+    this.motor.velocity.set(0, 0, 0);
+    this.motor.grounded = false;
+    this.faceWall(nx, nz);
+    this.setState('climb');
+    this.ctx.events.emit('footstep', { pos: this.position.clone(), surface: 'stone', intensity: 0.5, player: true });
+  }
+
+  private startMantle(x: number, z: number, nx: number, nz: number, top: number) {
+    this.cancelActions();
+    this.guarding = false;
+    this.mantleFrom.copy(this.position);
+    // ponto em cima do bloco, um pouco para dentro da borda
+    const inside = this.motor.radius + 0.22;
+    this.mantleTo.set(x - nx * inside, top, z - nz * inside);
+    const h = Math.max(0, top - this.position.y);
+    this.mantleDur = clamp(0.28 + h * 0.16, 0.3, 0.62);
+    this.climbN.set(nx, 0, nz).normalize();
+    this.motor.velocity.set(0, 0, 0);
+    this.faceWall(nx, nz);
+    this.setState('mantle');
+  }
+
+  private detachClimb(push: number, up: number) {
+    const n = this.climbN;
+    this.motor.velocity.set(n.x * push, up, n.z * push);
+    this.motor.grounded = false;
+    this.climbPushT = -0.35; // não gruda de novo na hora
+    this.setState('move');
+  }
+
+  private updateClimb(dt: number) {
+    const T = this.ctx.tuning;
+    const inp = this.ctx.input;
+    const W = this.ctx.physics;
+    const p = this.position;
+    const n = this.climbN;
+    this.staminaDelay = Math.max(this.staminaDelay, 0.5); // sem recuperar pendurado
+    inp.consume('attack');
+    inp.consume('dodge');
+    // soltar (Ctrl) · pular para longe (pulo segurando para trás)
+    if (inp.consume('sneak')) return this.detachClimb(1.2, 0);
+    let mx = inp.moveX, my = inp.moveY;
+    const len = Math.hypot(mx, my);
+    if (len > 1) { mx /= len; my /= len; }
+    if (inp.wasPressed('jump')) {
+      if (my < -0.5) {
+        this.faceWall(-n.x, -n.z);
+        return this.detachClimb(5.5, 5.5);
+      }
+      if (this.climbJumpT <= 0 && this.stamina >= 8) {
+        // salto na parede: impulso rápido na direção segurada (padrão: para cima)
+        this.climbJumpT = 0.32;
+        if (len < 0.2) this.climbJumpDir.set(0, 1);
+        else this.climbJumpDir.set(mx, my).normalize();
+        this.useStamina(T.dodgeCost * 1.4);
+        this.ctx.events.emit('jump', { pos: p.clone() });
+      }
+    }
+    // velocidade na parede
+    let vx = mx * 1.35, vy = my * 1.5;
+    if (this.climbJumpT > 0) {
+      const k = this.climbJumpT / 0.32;
+      vx = this.climbJumpDir.x * 6.5 * k;
+      vy = this.climbJumpDir.y * 7.5 * k;
+      this.climbJumpT -= dt;
+    }
+    const moving = Math.hypot(vx, vy) > 0.1;
+    this.climbMove = damp(this.climbMove, moving ? 1 : 0, 10, dt);
+    if (moving && this.climbJumpT <= 0) this.useStamina(9 * dt);
+    if (this.stamina <= 0) {
+      this.exhausted = true;
+      return this.detachClimb(0.8, 0);
+    }
+    // direita do personagem (olhando para a parede)
+    const fy = dirToYaw(-n.x, -n.z);
+    const rx = -Math.cos(fy), rz = Math.sin(fy);
+    // lateral: só se ainda houver parede no novo ponto
+    const nxp = p.x + rx * vx * dt, nzp = p.z + rz * vx * dt;
+    const probeFrom = (px: number, pz: number, y: number) => W.probeWall(px + n.x * 0.3, pz + n.z * 0.3, y, -n.x, -n.z, 0.3 + this.motor.radius + 0.4);
+    let hit = Math.abs(vx) > 1e-4 ? probeFrom(nxp, nzp, p.y + 1.1) : null;
+    if (hit) {
+      p.x = nxp;
+      p.z = nzp;
+    } else {
+      hit = probeFrom(p.x, p.z, p.y + 1.1);
+    }
+    // vertical
+    p.y += vy * dt;
+    // chão embaixo: descendo até o chão → solta de pé
+    const g = W.groundHeight(p.x + n.x * 0.1, p.z + n.z * 0.1, p.y, 0.05);
+    if (p.y <= g.y + 0.02) {
+      p.y = g.y;
+      if (my < -0.3 || !hit) {
+        this.motor.grounded = true;
+        this.climbPushT = -0.4;
+        this.setState('move');
+        return;
+      }
+    }
+    hit = probeFrom(p.x, p.z, p.y + 1.1) ?? probeFrom(p.x, p.z, p.y + 0.4);
+    if (!hit) return this.detachClimb(0.5, 0);
+    // gruda na parede (segue ângulos e troca de bloco)
+    n.lerp(new THREE.Vector3(hit.nx, 0, hit.nz), 1 - Math.exp(-dt * 20)).normalize();
+    const r = this.motor.radius * 0.85;
+    p.x = hit.x + hit.nx * r;
+    p.z = hit.z + hit.nz * r;
+    this.climbTop = hit.top;
+    this.faceWall(n.x, n.z);
+    this.climbPhase += (Math.abs(vy) + Math.abs(vx)) * dt / 0.9;
+    // chegou ao topo: as mãos passam da borda → sobe
+    if (this.climbTop - p.y < 1.3 && vy >= -0.05) {
+      return this.startMantle(hit.x, hit.z, hit.nx, hit.nz, this.climbTop);
+    }
+    this.motor.velocity.set(0, 0, 0);
+    this.motor.grounded = false;
+    this.motor.timeSinceGrounded = 0;
+  }
+
+  private updateMantle(dt: number) {
+    const u = clamp01(this.stateT / this.mantleDur);
+    const a = this.mantleFrom, b = this.mantleTo;
+    // sobe primeiro (puxa o corpo), depois passa por cima da borda
+    const up = 1 - Math.pow(1 - clamp01(u / 0.62), 2.2);
+    const fw = clamp01((u - 0.4) / 0.6);
+    const fws = fw * fw * (3 - 2 * fw);
+    this.position.set(lerp(a.x, b.x, fws), lerp(a.y, b.y + 0.04, up), lerp(a.z, b.z, fws));
+    this.motor.velocity.set(0, 0, 0);
+    this.staminaDelay = Math.max(this.staminaDelay, 0.2);
+    if (u >= 1) {
+      this.position.copy(b);
+      this.motor.grounded = true;
+      this.motor.groundY = b.y;
+      this.motor.timeSinceGrounded = 0;
+      this.climbPushT = 0;
+      this.setState('move');
+      this.ctx.events.emit('footstep', { pos: this.position.clone(), surface: this.motor.surface, intensity: 0.6, player: true });
     }
   }
 
@@ -699,6 +904,14 @@ export class PlayerController implements Damageable {
       this.stamina = Math.min(T.staminaMax, this.stamina + T.staminaRegen * dt * (this.exhausted ? 0.8 : 1));
     }
     if (this.exhausted && this.stamina >= T.staminaMax * 0.999) this.exhausted = false;
+
+    // ---------------------------------------------- escalada: estado próprio
+    if (this.state === 'climb' || this.state === 'mantle') {
+      if (this.state === 'climb') this.updateClimb(dt);
+      else this.updateMantle(dt);
+      this.buildAnim(dt);
+      return;
+    }
 
     // ---------------------------------------------- inputs de ação (com buffer)
     const attackPressed = inp.consume('attack');
@@ -1152,6 +1365,9 @@ export class PlayerController implements Damageable {
 
     m.update(dt);
 
+    // parede/beirada à frente? (escalar ou subir na beirada)
+    if (this.state === 'move' && !this.guarding) this.tryClimb(dt, mag, inYaw);
+
     if (m.landedThisFrame && this.state === 'attack' && this.attack?.air && !this.attack.slammed) {
       // pancada no chão: impacto forte e recuperação curta
       const a = this.attack;
@@ -1274,14 +1490,18 @@ export class PlayerController implements Damageable {
     s.attackWork = undefined;
     s.attackAir = false;
     s.attackSpin = false;
+    s.climbPhase = this.climbPhase;
+    s.climbMove = this.climbMove;
+    s.climbJump = this.state === 'climb' ? clamp01(this.climbJumpT / 0.32) : 0;
     s.spinYaw = 0;
     const map: Record<PlayerState, AnimAction> = {
-      move: 'none', attack: 'attack', charge: 'charge', dodge: 'dodge', bow: 'bow', bowRecover: 'bow',
+      move: 'none', attack: 'attack', charge: 'charge', dodge: 'dodge', bow: 'bow', bowRecover: 'bow', climb: 'climb', mantle: 'mantle',
       equip: 'equip', hurt: 'hurt', stagger: 'guardHit', guardHit: 'guardHit', dead: 'dead',
     };
     s.action = map[this.state];
     s.actionT = this.stateT;
     s.actionU = 0;
+    if (this.state === 'mantle') s.actionU = clamp01(this.stateT / this.mantleDur);
     switch (this.state) {
       case 'attack': {
         const a = this.attack!;

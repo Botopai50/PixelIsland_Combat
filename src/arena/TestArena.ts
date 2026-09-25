@@ -60,6 +60,12 @@ export class TestArena {
     // parede alta (colisão + câmera)
     this.box(-9, -3, 0.35, 4, 0, 3.2, 0, stone, 'stone');
     this.box(-11.5, 0.5, 2.5, 0.35, 0, 3.2, 0, stone, 'stone');
+    // torre de escalada (6 m) com um patamar no meio (beirada a 3 m)
+    this.box(15, -12, 1.8, 1.8, 0, 6, 0, stone, 'stone');
+    this.box(15, -9.3, 1.8, 0.9, 0, 3, 0, darkStone, 'stone');
+    // murinho para subir na beirada (1,1 m) e bloco para agarrar pulando (1,9 m)
+    this.box(11, -15.5, 1.4, 0.5, 0, 1.1, 0, darkStone, 'stone');
+    this.box(18.5, -15.5, 1.2, 0.8, 0, 1.9, 0, stone, 'stone');
     // parede de metal (clangor)
     this.box(-12, -8, 1.5, 0.2, 0, 2.4, 0.4, metal, 'metal');
 
@@ -110,6 +116,7 @@ export class TestArena {
     this.label('Degraus: 0.2 · 0.35 · 0.6 · 0.95 · 1.3 m', new THREE.Vector3(0.2, 2.3, -7));
     this.label('Parede (câmera/colisão)', new THREE.Vector3(-9, 3.8, -3));
     this.label('Metal', new THREE.Vector3(-12, 2.9, -8));
+    this.label('Escalada — ande contra a parede', new THREE.Vector3(15, 6.6, -12));
     this.buildScenery(scene);
   }
 

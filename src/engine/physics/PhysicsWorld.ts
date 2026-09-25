@@ -37,6 +37,19 @@ export interface RayHit {
   material: SurfaceMaterial;
 }
 
+export interface WallHit {
+  dist: number;
+  /** Normal da parede (horizontal, aponta para fora). */
+  nx: number;
+  nz: number;
+  /** Ponto de contato (XZ). */
+  x: number;
+  z: number;
+  /** Altura do topo do bloco. */
+  top: number;
+  collider: Collider;
+}
+
 export function makeBoxCollider(
   x: number, z: number, halfX: number, halfZ: number, minY: number, maxY: number,
   yaw = 0, material: SurfaceMaterial = 'stone',
@@ -151,6 +164,49 @@ export class PhysicsWorld {
       if (!any) break;
     }
     return touched;
+  }
+
+  /**
+   * Parede escalável à frente: raio HORIZONTAL na altura `y` a partir de (ox,oz)
+   * na direção (dx,dz), até `reach`. Só caixas visíveis e sem dono (árvore,
+   * boneco e limites invisíveis não contam). Analítico (não depende de malha).
+   */
+  probeWall(ox: number, oz: number, y: number, dx: number, dz: number, reach: number): WallHit | null {
+    let best: WallHit | null = null;
+    const l = { x: 0, z: 0 };
+    const w = { x: 0, z: 0 };
+    for (const c of this.colliders) {
+      if (!c.enabled || c.kind !== 'box' || c.owner || !c.mesh) continue;
+      if (y < c.minY + 0.02 || y >= c.maxY) continue;
+      this.local(c, ox, oz, l);
+      const cs = Math.cos(-c.yaw), sn = Math.sin(-c.yaw);
+      const ldx = dx * cs + dz * sn, ldz = -dx * sn + dz * cs;
+      let tmin = -Infinity, tmax = Infinity, axis = 0;
+      // eixo X local
+      if (Math.abs(ldx) < 1e-6) {
+        if (Math.abs(l.x) > c.halfX) continue;
+      } else {
+        let t1 = (-c.halfX - l.x) / ldx, t2 = (c.halfX - l.x) / ldx;
+        if (t1 > t2) [t1, t2] = [t2, t1];
+        if (t1 > tmin) { tmin = t1; axis = 0; }
+        tmax = Math.min(tmax, t2);
+      }
+      // eixo Z local
+      if (Math.abs(ldz) < 1e-6) {
+        if (Math.abs(l.z) > c.halfZ) continue;
+      } else {
+        let t1 = (-c.halfZ - l.z) / ldz, t2 = (c.halfZ - l.z) / ldz;
+        if (t1 > t2) [t1, t2] = [t2, t1];
+        if (t1 > tmin) { tmin = t1; axis = 1; }
+        tmax = Math.min(tmax, t2);
+      }
+      if (tmin > tmax || tmax < 0 || tmin < -0.05 || tmin > reach) continue;
+      if (best && tmin >= best.dist) continue;
+      const lnx = axis === 0 ? -Math.sign(ldx) : 0, lnz = axis === 1 ? -Math.sign(ldz) : 0;
+      this.world(c, lnx, lnz, w);
+      best = { dist: Math.max(0, tmin), nx: w.x - c.x, nz: w.z - c.z, x: ox + dx * tmin, z: oz + dz * tmin, top: c.maxY, collider: c };
+    }
+    return best;
   }
 
   /** Ponto dentro de algum colisor sólido (sem dono)? Usado para golpes que batem em paredes. */

@@ -5,6 +5,7 @@ export const CONTROLS_DESKTOP: [string, string][] = [
   ['Espaço', 'Pular (segure = mais alto)'],
   ['Botão esq. / J', 'Atacar · segure = ataque carregado · arco: puxar/soltar'],
   ['Botão dir. / K', 'Defender (no tempo certo = APARO) · cancela o arco'],
+  ['Escalar', 'Ande contra uma parede: gruda e escala com WASD (gasta stamina) · Espaço = salto na parede · Espaço + trás = pula para longe · Ctrl = solta · no topo sobe sozinho · beiradas baixas/ao alcance do pulo: sobe direto'],
   ['Ctrl', 'Esgueirar (liga/desliga): agachado, lento e silencioso; inimigos só percebem de perto'],
   ['Espaço (travado)', 'Esquiva — só com a mira travada: ←/→ salto lateral · parado/trás = pulo para trás (C/L também)'],
   ['Q / botão do meio', 'Travar mira (lock-on) / recentralizar câmera · travado: mouse rápido para o lado troca de alvo'],

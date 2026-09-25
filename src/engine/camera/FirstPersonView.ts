@@ -36,6 +36,7 @@ export class FirstPersonView {
   private attackW = 0;
   /** Escudo recolhe para baixo durante o golpe: o arco da lâmina fica legível. */
   private shieldTuck = 0;
+  private climbHide = 0;
   private bowAim = 0;
   private guardS = new Spring(300, 21);
   private wasGuarding = false;
@@ -168,6 +169,9 @@ export class FirstPersonView {
     let lower = (1 - easeOutBack(this.equipScale)) * 0.35;
     if (p.state === 'equip' && p.stateT < 0.14) lower = (p.stateT / 0.14) * 0.35;
     if (p.state === 'hurt') lower += Math.sin(clamp01(p.stateT / 0.4) * Math.PI) * 0.06;
+    // escalando: arma e escudo saem da tela (mãos na parede)
+    this.climbHide = damp(this.climbHide, p.state === 'climb' || p.state === 'mantle' ? 1 : 0, 10, dt);
+    lower += this.climbHide * 0.6;
     offset.y -= lower;
 
     for (const [id, m] of this.models) m.root.visible = id === main;

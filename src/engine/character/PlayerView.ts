@@ -116,7 +116,8 @@ export class PlayerView {
     rig.updateFlash(dt);
 
     // ---------------------------------------------------------------- guardar/sacar (estilo BotW)
-    const combatState = p.state !== 'move' && p.state !== 'equip' && p.state !== 'dodge';
+    const climbing = p.state === 'climb' || p.state === 'mantle';
+    const combatState = p.state !== 'move' && p.state !== 'equip' && p.state !== 'dodge' && !climbing;
     let enemyNear = false;
     for (const t of this.ctx.combat.targets) {
       if (t.team === 'enemy' && t.alive && t.center(this.v).distanceTo(p.position) < 9) {
@@ -126,6 +127,8 @@ export class PlayerView {
     }
     if (combatState || p.guardAmount > 0.05 || p.lockTarget || enemyNear) this.calmT = 0;
     else this.calmT += dt;
+    // escalando: armas nas costas (mãos livres)
+    if (climbing) this.calmT = Math.max(this.calmT, 3);
     const wantSheath = this.calmT > 2.5;
     if (wantSheath !== this.sheathed) {
       this.sheathed = wantSheath;

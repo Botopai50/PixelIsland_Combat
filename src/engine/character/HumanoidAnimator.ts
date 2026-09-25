@@ -13,7 +13,8 @@ import { clamp, clamp01, damp, lerp, easeOutCubic, easeInOutSine, TAU } from '..
  * (PlayerView/EnemyView), garantindo que a mão encontre a arma lógica.
  */
 export type AnimAction =
-  | 'none' | 'attack' | 'charge' | 'dodge' | 'bow' | 'equip' | 'hurt' | 'stagger' | 'dead' | 'spawn' | 'guardHit';
+  | 'none' | 'attack' | 'charge' | 'dodge' | 'bow' | 'equip' | 'hurt' | 'stagger' | 'dead' | 'spawn' | 'guardHit'
+  | 'climb' | 'mantle';
 
 export type DodgeType = 'hopL' | 'hopR' | 'hopF' | 'back' | 'flip';
 
@@ -49,6 +50,10 @@ export interface AnimInput {
   attackSpin?: boolean;
   /** Esgueirando (agachado, passos cuidadosos). */
   sneak?: boolean;
+  /** Escalada: fase do ciclo, quanto se move (0..1) e salto na parede (0..1). */
+  climbPhase?: number;
+  climbMove?: number;
+  climbJump?: number;
   spinYaw: number;
   crouch: number;
   dodgeType: DodgeType;
@@ -529,6 +534,51 @@ export class HumanoidAnimator {
           P.spine.x += 0.15;
         }
         targetBodyYaw = s.spinYaw;
+        break;
+      }
+      case 'climb': {
+        // escalada: de frente para a parede, braços alternando acima da cabeça,
+        // pernas dobradas alternando (mão direita sobe com o pé esquerdo)
+        snappy = true;
+        const cp = (s.climbPhase ?? 0) * TAU;
+        const mv = s.climbMove ?? 0;
+        const jp = s.climbJump ?? 0;
+        const a = Math.sin(cp) * mv;
+        const hang = Math.sin(this.t * 1.6) * 0.03 * (1 - mv);
+        P.spine.x = 0.08; P.chest.x = -0.05;
+        P.pelvis.x = 0.1;
+        P.head.x = -0.45; P.neck.x = -0.1;
+        P.spine.z = a * 0.06; P.pelvis.z = -a * 0.05;
+        // braços: alcançam para cima da cabeça, um mais alto que o outro
+        P.upperArmR.x = -2.55 - 0.35 * a - 0.5 * jp + hang; P.upperArmL.x = -2.55 + 0.35 * a - 0.5 * jp + hang;
+        P.upperArmR.z = -0.4; P.upperArmL.z = 0.4;
+        P.upperArmR.y = 0; P.upperArmL.y = 0;
+        P.forearmR.x = -0.55 + 0.4 * a * (a > 0 ? 1 : 0.3) + 0.3 * jp;
+        P.forearmL.x = -0.55 - 0.4 * a * (a < 0 ? 1 : 0.3) + 0.3 * jp;
+        // pernas: joelhos dobrados contra a parede, subindo alternado
+        P.thighR.x = -0.85 + 0.45 * a + 0.4 * jp; P.thighL.x = -0.85 - 0.45 * a + 0.4 * jp;
+        P.thighR.z = -0.18; P.thighL.z = 0.18;
+        P.shinR.x = 1.2 - 0.35 * a - 0.5 * jp; P.shinL.x = 1.2 + 0.35 * a - 0.5 * jp;
+        P.footR.x = -0.35; P.footL.x = -0.35;
+        bodyYOffset = 0.02 * a;
+        break;
+      }
+      case 'mantle': {
+        // subindo a beirada: puxa com os braços → apoia as mãos e empurra para
+        // baixo com o joelho subindo → fica de pé em cima
+        snappy = true;
+        const pull = 1 - clamp01(u / 0.45);
+        const push = Math.sin(clamp01(u / 0.85) * Math.PI);
+        const stand = clamp01((u - 0.7) / 0.3);
+        P.upperArmR.x = P.upperArmL.x = -2.4 * pull + 0.35 * push * (1 - pull);
+        P.upperArmR.z = -0.35; P.upperArmL.z = 0.35;
+        P.forearmR.x = P.forearmL.x = -0.9 * pull - 0.3 * push * (1 - pull);
+        P.spine.x = 0.15 + 0.45 * push;
+        P.head.x = -0.35 * pull + 0.1 * push;
+        P.thighR.x = (-1.5 * push) * (1 - stand); P.thighL.x = (-0.6 * push) * (1 - stand);
+        P.shinR.x = (1.9 * push) * (1 - stand) + 0.05; P.shinL.x = (1.2 * push) * (1 - stand) + 0.05;
+        P.footR.x = -0.3 * push; P.footL.x = -0.2 * push;
+        bodyYOffset = -0.12 * push * (1 - stand);
         break;
       }
       case 'dodge': {
