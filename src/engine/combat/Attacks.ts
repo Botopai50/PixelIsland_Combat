@@ -95,7 +95,7 @@ export const ATTACKS: Record<string, AttackDef> = {
   // Ferramentas: golpes de TRABALHO. Duas mãos no cabo, pés plantados, ritmo repetido.
   // Machado: corte horizontal de lenhador que PARA no tronco (não atravessa o corpo) e é puxado de volta.
   axe1: A({ id: 'axe1', label: 'Machadada', windup: 0.3, active: 0.1, recovery: 0.4, damage: 17, strength: 0.55, knockback: 3, hitStop: 0.08, shake: 0.22, arc: [120, -12], roll: -4, pitch: 18, pivot: 'chest', lunge: 0, cancelAt: 0.14, chainAt: 0.16, next: 'axe1', whoosh: 0.55, bodyTwist: 0.45, work: 'chop' }),
-  axeCharged: A({ id: 'axeCharged', label: 'Machadada Carregada', windup: 0.08, active: 0.12, recovery: 0.55, damage: 45, strength: 1, knockback: 6, hitStop: 0.15, shake: 0.6, arc: [100, -62], roll: 90, pitch: 0, pivot: 'chest', lunge: 0, cancelAt: 0.3, whoosh: 1, bodyTwist: 0, stamina: 25, work: 'mine', overhead: true }),
+  axeCharged: A({ id: 'axeCharged', label: 'Machadada Carregada', windup: 0.08, active: 0.12, recovery: 0.55, damage: 45, strength: 1, knockback: 6, hitStop: 0.15, shake: 0.6, arc: [100, -45], roll: -4, pitch: 12, pivot: 'chest', lunge: 0, cancelAt: 0.3, whoosh: 1, bodyTwist: 0.6, stamina: 25, work: 'chop' }),
 
   // --------------------------------------------------------- picareta: golpes verticais
   // Picareta: ergue acima da cabeça e desce até o chão à frente, dobrando o tronco.

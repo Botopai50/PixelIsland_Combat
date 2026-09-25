@@ -99,7 +99,7 @@ const S: Record<string, Style> = {
 const BY_ATTACK: Record<string, string> = {
   sword1: 'slashRL', flurryA: 'slashRL', sword2: 'slashLR', flurryB: 'slashLR',
   sword3: 'overhead', swordAir: 'overhead', swordSpin: 'spin',
-  axe1: 'chop', axeCharged: 'mine', pick1: 'mine', pickCharged: 'mine',
+  axe1: 'chop', axeCharged: 'chop', pick1: 'mine', pickCharged: 'mine',
 };
 
 export function viewmodelStyle(attackId: string): Style {

@@ -178,14 +178,31 @@ export class PlayerView {
           const tremble = Math.sin(p.time * 40) * 2 * clamp01(p.chargeT / T.chargeTime);
           // ferramentas (golpe vertical): erguidas acima da cabeça, centralizadas;
           // sobem um pouco mais conforme a carga enche
-          if (def.id === 'axeCharged') angle = 86 + 8 * clamp01(p.chargeT / T.chargeTime) + tremble; // machado: na vertical acima da cabeça
-          else if (def.work) angle = 112 + 18 * clamp01(p.chargeT / T.chargeTime) + tremble;
+          if (def.work === 'mine') angle = 112 + 18 * clamp01(p.chargeT / T.chargeTime) + tremble;
           else angle = def.arc[0] - sgn * 22 + tremble;
         }
         swingDirLocal(def, angle, this.dir, this.edge, p.state === 'attack' ? p.attack?.aimPitch ?? 0 : 0);
         const { pivot, reach: reach0 } = pivotFor(def);
         const reach = reach0;
-        this.hand.copy(pivot).addScaledVector(this.dir, reach).applyQuaternion(this.yawQ).add(p.position);
+        this.hand.copy(pivot).addScaledVector(this.dir, reach);
+        // machado carregado (golpe lateral): pose de TACO — mãos junto ao ombro
+        // direito, machado quase de pé, gume para a frente; no início do golpe
+        // desce suavemente dessa pose para a lateral
+        if (def.id === 'axeCharged') {
+          let k = 0;
+          if (p.state === 'charge') k = 1;
+          else if (p.state === 'attack' && p.swingPhase === 'windup') k = 1 - p.swingU * p.swingU * (3 - 2 * p.swingU);
+          if (k > 0) {
+            const ck = clamp01(p.chargeT / T.chargeTime);
+            const tr = p.state === 'charge' ? Math.sin(p.time * 40) * 0.025 * ck : 0;
+            const bh = this.v.set(-0.26, 1.4 + 0.04 * ck, 0.1);
+            const bd = this.v2.set(-0.22 + tr, 0.95, -0.18 - 0.06 * ck).normalize();
+            this.hand.lerp(bh, k);
+            this.dir.lerp(bd, k).normalize();
+            this.edge.lerp(this.v2.set(0.15, 0, 1).normalize(), k).normalize();
+          }
+        }
+        this.hand.applyQuaternion(this.yawQ).add(p.position);
         this.hand.y += p.motor.visualStepOffset;
         this.dir.applyQuaternion(this.yawQ);
         this.edge.applyQuaternion(this.yawQ);
