@@ -184,13 +184,16 @@ export class PlayerView {
         }
         swingDirLocal(def, angle, this.dir, this.edge, p.state === 'attack' ? p.attack?.aimPitch ?? 0 : 0);
         if (p.state === 'charge' && def.work === 'chop') {
-          // machado carregando (lenhador): puxado para trás na lateral direita,
-          // um pouco acima do ombro, cabeça do machado atrás, gume para a frente
+          // machado carregando: ao lado do corpo, na altura do ombro, apontando
+          // para a direita e só um pouco para trás (nada atrás da cabeça);
+          // gume virado para a frente, pronto para o corte lateral
           const tr = Math.sin(p.time * 40) * 0.03 * clamp01(p.chargeT / T.chargeTime);
-          this.dir.set(-0.62 + tr, 0.42, -0.66).normalize();
-          this.edge.set(0.75, 0.05, -0.2).normalize();
+          this.dir.set(-0.62, 0.7 + tr, -0.3).normalize();
+          this.edge.set(0.2, 0.05, 1).normalize();
         }
-        const { pivot, reach } = pivotFor(def);
+        const { pivot, reach: reach0 } = pivotFor(def);
+        // machado carregando: mãos junto ao ombro direito (não esticadas)
+        const reach = p.state === 'charge' && def.work === 'chop' ? 0.3 : reach0;
         this.hand.copy(pivot).addScaledVector(this.dir, reach).applyQuaternion(this.yawQ).add(p.position);
         this.hand.y += p.motor.visualStepOffset;
         this.dir.applyQuaternion(this.yawQ);
