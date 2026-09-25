@@ -23,6 +23,8 @@ export type GameEvents = {
   wallHit: { pos: THREE.Vector3; dir: THREE.Vector3; normal: THREE.Vector3; material: string; intensity: number };
   footstep: { pos: THREE.Vector3; surface: string; intensity: number; player: boolean };
   jump: { pos: THREE.Vector3 };
+  /** Tranco ao se puxar para cima de uma borda. */
+  mantlePull: { pos: THREE.Vector3; intensity: number };
   land: { pos: THREE.Vector3; intensity: number; surface: string; player: boolean };
   dodge: { pos: THREE.Vector3 };
   perfectDodge: { pos: THREE.Vector3 };

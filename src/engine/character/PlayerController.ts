@@ -135,6 +135,7 @@ export class PlayerController implements Damageable {
   /** Preparação do salto na parede (junta forças antes do impulso). */
   private climbGatherT = 0;
   private mantleH = 1;
+  private mantleJerked = false;
   private guardPressAt = -10;
 
   // esquiva
@@ -493,6 +494,7 @@ export class PlayerController implements Damageable {
     this.mantleDur = clamp(0.42 + h * 0.3, 0.5, 1.05);
     this.climbN.set(nx, 0, nz).normalize();
     this.climbWall.set(x, top, z);
+    this.mantleJerked = false;
     this.motor.velocity.set(0, 0, 0);
     this.faceWall(nx, nz);
     this.setState('mantle');
@@ -609,14 +611,21 @@ export class PlayerController implements Damageable {
   private updateMantle(dt: number) {
     const u = clamp01(this.stateT / this.mantleDur);
     const a = this.mantleFrom, b = this.mantleTo;
-    // pendura (cede um pouco) → puxa com esforço (começa devagar) → passa o
-    // joelho pela borda → levanta em cima
-    const lift = clamp01((u - 0.12) / 0.55);
-    const up = lift * lift * (3 - 2 * lift);
-    const sag = Math.sin(clamp01(u / 0.14) * Math.PI) * 0.06 * Math.min(1, this.mantleH);
+    // pendura e JUNTA FORÇA (cede um pouco) → TRANCO: puxão rápido que passa um
+    // pouco do ponto → assenta → passa o joelho pela borda → levanta em cima
+    const PULL = 0.22;
+    const lift = clamp01((u - PULL) / 0.3);
+    const jerk = 1 - Math.pow(1 - lift, 3); // sai rápido, desacelera
+    const over = Math.sin(lift * Math.PI) * 0.07 * Math.min(1, this.mantleH);
+    const up = Math.min(1, jerk);
+    const sag = Math.sin(clamp01(u / PULL) * Math.PI * 0.5) * 0.09 * Math.min(1, this.mantleH) * (1 - lift);
+    if (u >= PULL && !this.mantleJerked) {
+      this.mantleJerked = true;
+      this.ctx.events.emit('mantlePull', { pos: this.position.clone(), intensity: Math.min(1, this.mantleH / 1.8) });
+    }
     const fw = clamp01((u - 0.5) / 0.4);
     const fws = fw * fw * (3 - 2 * fw);
-    this.position.set(lerp(a.x, b.x, fws), lerp(a.y, b.y + 0.04, up) - sag, lerp(a.z, b.z, fws));
+    this.position.set(lerp(a.x, b.x, fws), lerp(a.y, b.y + 0.04, up) + over - sag, lerp(a.z, b.z, fws));
     this.motor.velocity.set(0, 0, 0);
     this.staminaDelay = Math.max(this.staminaDelay, 0.2);
     if (u >= 1) {

@@ -585,8 +585,9 @@ export class HumanoidAnimator {
         // (cotovelos dobram, peito passa a borda) → apoia as mãos e empurra
         // para baixo, joelho direito sobe na borda → levanta
         snappy = true;
-        const hangK = 1 - clamp01(u / 0.14);
-        const pullK = Math.sin(clamp01((u - 0.08) / 0.5) * Math.PI * 0.5);
+        const hangK = 1 - clamp01((u - 0.1) / 0.14);
+        // junta força pendurado e dá o TRANCO (puxão rápido em ~0,2 s)
+        const pullK = 1 - Math.pow(1 - clamp01((u - 0.2) / 0.25), 3);
         const press = Math.sin(clamp01((u - 0.45) / 0.45) * Math.PI);
         const stand = clamp01((u - 0.78) / 0.22);
         const pre = 1 - clamp01((u - 0.45) / 0.15); // antes de apoiar as mãos

@@ -83,6 +83,15 @@ export class CameraJuice {
       this.pitch.impulse(0.7 * k());
       this.dollyS.impulse(1.4 * k() * third());
     });
+    ev.on('mantlePull', (e) => {
+      // tranco para cima: cabeça dá um solavanco e a câmera "puxa"
+      this.pitch.impulse((1.2 + 1.3 * e.intensity) * k());
+      this.roll.impulse((Math.random() < 0.5 ? -1 : 1) * 0.5 * k());
+      this.fovS.impulse(-14 * k());
+      this.dollyS.impulse(-0.8 * k() * third());
+      if (ctx.tuning.shakeEnabled) ctx.shake.add(0.12 + 0.1 * e.intensity);
+      ctx.sound.play('jump', { pos: e.pos, vol: 0.55 });
+    });
     ev.on('land', (e) => {
       if (!e.player) return;
       this.pitch.impulse(-(0.6 + e.intensity * 3) * k());
