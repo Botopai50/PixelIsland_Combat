@@ -80,8 +80,10 @@ export class ProjectileSystem {
       a.life -= dt;
       if (a.flying) {
         const p0 = this.tmpA.copy(a.pos);
-        a.vel.y -= this.gravity * dt;
+        // integração exata da parábola (a mira compensa a queda com a fórmula analítica)
         const p1 = this.tmpB.copy(a.pos).addScaledVector(a.vel, dt);
+        p1.y -= 0.5 * this.gravity * dt * dt;
+        a.vel.y -= this.gravity * dt;
         const segLen = p0.distanceTo(p1);
         // 1) alvos
         const hits = ctx.combat.querySegment(p0, p1, 0.04, a.team);

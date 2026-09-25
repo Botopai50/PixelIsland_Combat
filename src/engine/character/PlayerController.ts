@@ -21,6 +21,8 @@ export interface AimSource {
   readonly firstPerson: boolean;
   /** Ponto de mundo sob a mira (para o arco). */
   aimPoint(out: THREE.Vector3): THREE.Vector3;
+  /** Raio da mira (posição e direção da câmera). */
+  aimRay(origin: THREE.Vector3, dir: THREE.Vector3): void;
   recenter(): void;
 }
 
@@ -587,10 +589,16 @@ export class PlayerController implements Damageable {
       this.setState('move');
       return;
     }
-    const origin = this.bowOrigin(new THREE.Vector3());
     const target = this.aim.aimPoint(new THREE.Vector3());
-    const dir = target.sub(origin).normalize();
+    const origin = this.bowOrigin(new THREE.Vector3());
+    if (this.aim.firstPerson) {
+      // 1ª pessoa: a flecha sai NA linha da mira (sem paralaxe do lado do rosto)
+      const ro = new THREE.Vector3(), rd = new THREE.Vector3();
+      this.aim.aimRay(ro, rd);
+      origin.copy(ro).addScaledVector(rd, 0.6);
+    }
     const speed = lerp(16, 58, Math.pow(draw, 1.2));
+    const dir = ballisticDir(origin, target, speed, this.projectiles.gravity);
     const dmg = lerp(6, 24, draw) * T.damageMul;
     this.projectiles.fire(origin, dir.multiplyScalar(speed), 'player', this, dmg, draw);
     this.ctx.events.emit('bowFire', { pos: origin, power: draw });
@@ -1281,4 +1289,21 @@ export class PlayerController implements Damageable {
     }
     return null;
   }
+}
+
+/**
+ * Direção de lançamento que ACERTA `target` com a gravidade (arco baixo).
+ * Sem solução (longe demais para a força) → reta até o alvo.
+ */
+function ballisticDir(origin: THREE.Vector3, target: THREE.Vector3, speed: number, g: number): THREE.Vector3 {
+  const d = new THREE.Vector3().subVectors(target, origin);
+  const h = d.y;
+  const flat = Math.hypot(d.x, d.z);
+  const v2 = speed * speed;
+  const disc = v2 * v2 - g * (g * flat * flat + 2 * h * v2);
+  // alvo "no infinito" (a mira não acertou nada) ou sem solução: reto
+  if (flat < 0.01 || flat > 100 || disc < 0) return d.normalize();
+  const ang = Math.atan2(v2 - Math.sqrt(disc), g * flat);
+  const out = new THREE.Vector3(d.x / flat * Math.cos(ang), Math.sin(ang), d.z / flat * Math.cos(ang));
+  return out.normalize();
 }

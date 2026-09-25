@@ -65,6 +65,11 @@ export class CameraRig implements AimSource {
     this.recenterT = 0.25;
   }
 
+  aimRay(origin: THREE.Vector3, dir: THREE.Vector3) {
+    origin.copy(this.camera.position);
+    this.camera.getWorldDirection(dir);
+  }
+
   aimPoint(out: THREE.Vector3): THREE.Vector3 {
     const cam = this.camera;
     cam.getWorldDirection(this.dir);
