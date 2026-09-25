@@ -36,6 +36,7 @@ export class FirstPersonView {
   private attackW = 0;
   /** Escudo recolhe para baixo durante o golpe: o arco da lâmina fica legível. */
   private shieldTuck = 0;
+  private bowAim = 0;
   private guardS = new Spring(300, 21);
   private wasGuarding = false;
   /** Tela estreita (celular em pé): armas menores e mais perto do centro. */
@@ -180,8 +181,11 @@ export class FirstPersonView {
     if (model && main !== 'bow') {
       model.root.scale.set(aspectK, T.rangeMul * aspectK, aspectK);
       // pose de descanso (espaço da câmera)
-      this.restPos.set(0.27, -0.3, -0.42).add(offset);
-      const restDir = this.dir.set(-0.12, 0.75, -0.6).normalize();
+      // descanso baixo no canto direito, lâmina/cabo apontando para frente
+      // (ocupa pouco da tela; o golpe continua saindo daqui)
+      const tool = main === 'axe' || main === 'pickaxe';
+      this.restPos.set(tool ? 0.3 : 0.3, tool ? -0.42 : -0.38, -0.46).add(offset);
+      const restDir = (tool ? this.dir.set(0.12, 0.42, -0.9) : this.dir.set(0.02, 0.5, -0.86)).normalize();
       const restEdge = this.edge.set(-0.9, 0.1, -0.2).normalize();
       weaponBasis(restDir, restEdge, this.restQ);
       if (sprint) this.restQ.premultiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.5, 0.3, 0)));
@@ -252,11 +256,13 @@ export class FirstPersonView {
       const nocked = drawing && p.inventory.count('arrow') > 0;
       model.setDraw?.(draw, nocked);
       model.root.scale.setScalar(1);
-      const aimW = drawing || p.state === 'bowRecover' ? 1 : 0;
-      const grip = this.hand.set(lerp(-0.2, -0.06, aimW), lerp(-0.3, -0.12, aimW), lerp(-0.45, -0.55, aimW)).add(offset);
+      this.bowAim = damp(this.bowAim, drawing || p.state === 'bowRecover' ? 1 : 0, 16, dt);
+      const aimW = this.bowAim;
+      // descanso: baixo à esquerda, deitado | mirando: sobe para a frente da mira
+      const grip = this.hand.set(lerp(-0.4, -0.06, aimW) * aspectK, lerp(-0.42, -0.12, aimW), lerp(-0.5, -0.55, aimW)).add(offset);
       grip.z += this.kick.value * 0.03;
       model.root.position.copy(grip);
-      model.root.quaternion.setFromEuler(new THREE.Euler(0, Math.PI, lerp(0.5, 0.2, aimW)));
+      model.root.quaternion.setFromEuler(new THREE.Euler(lerp(-1.05, 0, aimW), Math.PI, lerp(0.3, 0.2, aimW)));
       this.placeArm(this.armL, grip, -1);
       // mão direita na corda
       const stringPos = this.v2.set(0, 0, -0.1 - draw * BOW_DRAW_LEN).applyQuaternion(model.root.quaternion).add(grip);
