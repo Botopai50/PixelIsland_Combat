@@ -84,6 +84,8 @@ export class PlayerView {
     this.hidden = !v;
   }
   private hidden = false;
+  /** Esconde arma e escudo (visualizador de rig). */
+  hideGear = false;
   /** Tempo desde a última ação de combate (arma volta às costas depois de um tempo). */
   private calmT = 0;
   sheathed = false;
@@ -158,7 +160,7 @@ export class PlayerView {
     this.equipScale = damp(this.equipScale, 1, 14, dt);
     let mainScale = easeOutBack(clamp01(this.equipScale));
     if (p.state === 'equip' && p.stateT < 0.12) mainScale = Math.max(0.05, 1 - p.stateT / 0.12);
-    for (const [id, m] of this.models) m.root.visible = !this.hidden && id === main;
+    for (const [id, m] of this.models) m.root.visible = !this.hidden && !this.hideGear && id === main;
     const model = main ? this.models.get(main) : undefined;
 
     // ---------------------------------------------------------------- arma principal
@@ -283,7 +285,7 @@ export class PlayerView {
 
     // ---------------------------------------------------------------- escudo
     const sh = this.shield;
-    sh.root.visible = !this.hidden && p.offHand === 'shield';
+    sh.root.visible = !this.hidden && !this.hideGear && p.offHand === 'shield';
     if (sh.root.visible) {
       // com ferramenta (duas mãos) o escudo fica nas costas, exceto ao defender
       const toolInHands = main === 'axe' || main === 'pickaxe';

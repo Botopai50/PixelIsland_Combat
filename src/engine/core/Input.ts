@@ -6,7 +6,7 @@
 export type Action =
   | 'attack' | 'guard' | 'jump' | 'dodge' | 'sprint' | 'lock'
   | 'view' | 'shoulder' | 'inventory' | 'tweak' | 'spawn' | 'reset' | 'help'
-  | 'runToggle' | 'nextItem' | 'prevItem' | 'juice' | 'sneak'
+  | 'runToggle' | 'nextItem' | 'prevItem' | 'juice' | 'sneak' | 'rigView'
   | 'slot1' | 'slot2' | 'slot3' | 'slot4' | 'slot5' | 'slot6';
 
 export class Input {
@@ -110,7 +110,7 @@ export class Input {
       Space: 'jump', ShiftLeft: 'sprint', ShiftRight: 'sprint',
       ControlLeft: 'sneak', ControlRight: 'sneak', KeyC: 'dodge',
       KeyQ: 'lock', KeyV: 'view', KeyT: 'shoulder', Tab: 'inventory', KeyI: 'inventory',
-      KeyP: 'tweak', KeyB: 'juice', KeyG: 'spawn', KeyR: 'reset', KeyH: 'help', KeyZ: 'runToggle', CapsLock: 'runToggle',
+      KeyP: 'tweak', KeyB: 'juice', KeyG: 'spawn', KeyR: 'reset', KeyH: 'help', KeyZ: 'runToggle', KeyX: 'rigView', CapsLock: 'runToggle',
       KeyJ: 'attack', KeyK: 'guard', KeyL: 'dodge',
       Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', Digit6: 'slot6',
     };

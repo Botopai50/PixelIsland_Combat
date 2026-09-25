@@ -10,6 +10,7 @@ export const CONTROLS_DESKTOP: [string, string][] = [
   ['Espaço (travado)', 'Esquiva — só com a mira travada: ←/→ salto lateral · parado/trás = pulo para trás · frente = pulo normal (C/L também)'],
   ['Q / botão do meio', 'Travar mira (lock-on) / recentralizar câmera · travado: mouse rápido para o lado troca de alvo'],
   ['V', 'Alternar 1ª / 3ª pessoa'],
+  ['X', 'Ver rig: esqueleto com nomes (nosso · Mixamo) → pose de repouso → desliga'],
   ['T', 'Trocar ombro da câmera'],
   ['1–6 / roda', 'Barra rápida (equipar)'],
   ['Tab / I', 'Inventário'],

@@ -45,6 +45,7 @@ itch.io, Netlify…).
 | Botão esquerdo / J | Atacar · **segurar** = ataque carregado · com arco: puxar e soltar |
 | Botão direito / K | Defender · **no instante do golpe** = APARO · cancela o arco |
 | Andar contra parede | Escalar (estilo BotW): WASD na parede gasta stamina · Espaço = salto na parede · Espaço + trás = pula para longe · Ctrl = solta · sobe sozinho no topo e em beiradas baixas / ao alcance do pulo |
+| X | Ver rig: esqueleto com nomes das articulações (e equivalente Mixamo) → pose de repouso → desliga |
 | Ctrl | Esgueirar (liga/desliga): agachado, lento, passos silenciosos, inimigos só percebem de perto |
 | Espaço (com mira travada) | Esquiva estilo BotW, só travado (C/L também): ←/→ salto lateral · para trás ou parado = pulo para trás · para frente = pulo normal |
 | Q / botão do meio | Lock-on (travar no inimigo) · sem alvo: recentraliza a câmera |

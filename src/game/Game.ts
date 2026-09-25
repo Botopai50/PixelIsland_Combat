@@ -27,6 +27,7 @@ import { bladeSegmentWorld } from '../engine/combat/Attacks';
 import { TestArena } from '../arena/TestArena';
 import { createHelpOverlay, createStartOverlay } from './Overlays';
 import { exportModelsGLB } from './ExportModels';
+import { RigViewer } from '../engine/debug/RigViewer';
 import { rand } from '../engine/core/math';
 
 /**
@@ -49,6 +50,7 @@ export class Game {
   private invPanel: InventoryPanel;
   private tweak: TweakPanel;
   private touch: TouchControls;
+  private rigViewer: RigViewer;
   private help: ReturnType<typeof createHelpOverlay>;
   private debug = new DebugDraw();
   private started = false;
@@ -100,6 +102,7 @@ export class Game {
     this.camRig.player = this.player;
     ctx.combat.add(this.player);
     this.view = new PlayerView(ctx, this.player);
+    this.rigViewer = new RigViewer(ctx.scene, this.view.rig);
     this.fpv = new FirstPersonView(ctx, this.player);
     this.enemies = new EnemyDirector(ctx);
     this.arena = new TestArena(ctx, this.pickups);
@@ -126,6 +129,7 @@ export class Game {
       'Gerar inimigo': () => this.spawnEnemy(),
       'Restaurar arena': () => this.resetArena(),
       'Exportar modelos (.glb)': () => exportModelsGLB(),
+      'Ver rig (X)': () => this.toggleRig(),
     });
     if (this.isTouch) this.tweak.gui.domElement.classList.add('touch');
 
@@ -181,6 +185,14 @@ export class Game {
     this.setPaused(this.invPanel.isOpen);
   }
 
+  /** Mostra o esqueleto do personagem (e depois a pose de repouso). */
+  toggleRig() {
+    const msg = this.rigViewer.cycle();
+    this.view.hideGear = this.rigViewer.mode !== 'off';
+    if (this.rigViewer.mode !== 'off' && this.camRig.mode === 'first') this.camRig.toggleView();
+    this.hud.toast(msg, 'info');
+  }
+
   spawnEnemy() {
     if (this.enemies.enemies.filter((e) => e.alive).length >= 8) {
       this.hud.toast('Limite de 8 inimigos', 'warn');
@@ -232,6 +244,7 @@ export class Game {
     }
     if (inp.consume('spawn')) this.spawnEnemy();
     if (inp.consume('reset')) this.resetArena();
+    if (inp.consume('rigView')) this.toggleRig();
     if (inp.consume('runToggle')) this.hud.toast(inp.runLock ? 'Correr travado (Z para soltar)' : 'Andando', 'info');
   }
 
@@ -263,6 +276,7 @@ export class Game {
     const first = this.camRig.blend > 0.5;
     this.view.visible = !first && this.camRig.headDistance > 0.6;
     this.view.update(pdt);
+    this.rigViewer.update();
     this.fpv.visible = first;
     this.fpv.update(pdt, cam);
     const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
