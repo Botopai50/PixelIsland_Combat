@@ -5,7 +5,7 @@ export const CONTROLS_DESKTOP: [string, string][] = [
   ['Espaço', 'Pular (segure = mais alto)'],
   ['Botão esq. / J', 'Atacar · segure = ataque carregado · arco: puxar/soltar'],
   ['Botão dir. / K', 'Defender (no tempo certo = APARO) · cancela o arco'],
-  ['Ctrl / C / L', 'Esquiva: ←/→ salto lateral · parado/trás = pulo para trás · frente = salto curto'],
+  ['Ctrl / C / L', 'Esquiva: ←/→ salto lateral · parado/trás = pulo para trás'],
   ['Q / botão do meio', 'Travar mira (lock-on) / recentralizar câmera · travado: mouse rápido para o lado troca de alvo'],
   ['V', 'Alternar 1ª / 3ª pessoa'],
   ['T', 'Trocar ombro da câmera'],

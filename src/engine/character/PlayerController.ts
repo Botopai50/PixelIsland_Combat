@@ -522,10 +522,14 @@ export class PlayerController implements Damageable {
     const T = this.ctx.tuning;
     const inp = this.ctx.input;
     const hasInput = Math.hypot(inp.moveX, inp.moveY) > 0.25;
+    // sem esquiva para a frente: só para frente não faz nada (nem gasta stamina);
+    // na diagonal para frente vale o salto lateral
+    const sideways = Math.abs(inp.moveX) > 0.3;
+    if (hasInput && inp.moveY > 0.25 && !sideways) return;
     this.cancelActions();
     this.guarding = false;
     // Esquiva estilo BotW: sem rolamento. Saltos laterais para os lados,
-    // pulo para trás (sem direção ou para trás) e um salto curto para frente.
+    // pulo para trás (sem direção ou para trás). Para a frente não há esquiva.
     // Referência: o alvo travado ou, sem lock, a direção da câmera.
     const refYaw = this.lockTarget ? this.facing : this.aim.yaw;
     let type: DodgeType;
@@ -535,14 +539,10 @@ export class PlayerController implements Damageable {
       type = 'back';
       dirYaw = refYaw + Math.PI;
       durMul = 1.35; // cobre o tempo no ar (~0,46 s) até a aterrissagem
-    } else if (Math.abs(inp.moveX) >= Math.abs(inp.moveY) * 0.8) {
+    } else {
       type = inp.moveX < 0 ? 'hopL' : 'hopR';
       dirYaw = refYaw + (inp.moveX < 0 ? Math.PI / 2 : -Math.PI / 2);
       durMul = 0.85;
-    } else {
-      type = 'hopF';
-      dirYaw = refYaw;
-      durMul = 0.8;
     }
     if (!this.lockTarget) this.facing = refYaw;
     this.dodgeType = type;
