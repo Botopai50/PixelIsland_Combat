@@ -523,9 +523,9 @@ export class HumanoidAnimator {
           const tuck = Math.sin(clamp01((u - 0.2) / 0.6) * Math.PI);
           const land = clamp01((u - 0.78) / 0.22);
           const arch = Math.sin(clamp01(u / 0.55) * Math.PI);
-          P.spine.x = -0.55 * arch + 0.35 * tuck * (u > 0.45 ? 1 : 0.3) + 0.4 * land;
-          P.chest.x = -0.25 * arch;
-          P.head.x = 0.35 * arch - 0.1 * land;
+          P.spine.x = -0.18 * arch + 0.3 * tuck * (u > 0.45 ? 1 : 0.3) + 0.35 * land;
+          P.chest.x = -0.06 * arch;
+          P.head.x = 0.12 * arch - 0.1 * land;
           P.thighR.x = -1.35 * tuck + 0.2 * push; P.shinR.x = 1.7 * tuck + 0.5 * land;
           P.thighL.x = -1.1 * tuck + 0.3 * push; P.shinL.x = 1.5 * tuck + 0.5 * land;
           P.thighR.x -= 0.5 * land; P.thighL.x -= 0.5 * land;
@@ -534,7 +534,7 @@ export class HumanoidAnimator {
           P.upperArmR.x = P.upperArmL.x = -1.1 * arch - 0.5 * tuck;
           P.upperArmR.z = -0.55 * k; P.upperArmL.z = 0.55 * k;
           P.forearmR.x = P.forearmL.x = -0.3 * k;
-          targetBodyRotX = -0.55 * arch + 0.25 * land;
+          targetBodyRotX = -0.14 * arch + 0.2 * land;
           bodyYOffset = 0.22 * tuck - 0.25 * land - 0.12 * push;
         } else {
           // salto lateral (BotW): corpo inclina para o lado do salto, pernas juntas recolhidas
