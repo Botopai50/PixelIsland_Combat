@@ -952,7 +952,8 @@ export class PlayerController implements Damageable {
     const v = m.velocity;
     const mag = Math.min(1, Math.hypot(inp.moveX, inp.moveY));
     const inYaw = this.inputYaw();
-    const wantSprint = (inp.isHeld('sprint') || inp.runLock) && mag > 0.3 && !this.exhausted;
+    // travado no alvo não corre (andaria de costas/de lado em disparada)
+    const wantSprint = (inp.isHeld('sprint') || inp.runLock) && mag > 0.3 && !this.exhausted && !this.lockTarget;
 
     let maxSpeed = 0;
     let steer = true;
