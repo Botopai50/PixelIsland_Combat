@@ -112,9 +112,6 @@ export class PlayerView {
     }
     rig.updateFlash(dt);
 
-    this.animator.update(dt, p.anim);
-    rig.root.updateMatrixWorld(true);
-
     // ---------------------------------------------------------------- guardar/sacar (estilo BotW)
     const combatState = p.state !== 'move' && p.state !== 'equip' && p.state !== 'dodge';
     let enemyNear = false;
@@ -133,6 +130,12 @@ export class PlayerView {
       if (p.mainHand) this.ctx.sound.play(wantSheath ? 'unequip' : 'equip', { pos: p.position, vol: 0.5, variant: 'blade' });
     }
     const sheathed = this.sheathed;
+    // postura de prontidão (idle de combate) quando a arma corpo a corpo está em mãos
+    p.anim.ready = !sheathed && (p.mainHand === 'sword' || p.mainHand === 'axe' || p.mainHand === 'pickaxe') ? 1 : 0;
+    p.anim.hasShieldUp = p.hasShield;
+    this.animator.update(dt, p.anim);
+    rig.root.updateMatrixWorld(true);
+
 
     // ---------------------------------------------------------------- equipamento visível
     const main = p.mainHand;
@@ -284,9 +287,9 @@ export class PlayerView {
         const g = p.guardAmount;
         if (g > 0.01) {
           // pose de defesa: à frente do peito, voltado para frente
-          const guardPos = this.v2.set(0.1, 1.28, 0.44 - this.shieldSpring.value * 0.05).applyQuaternion(this.yawQ).add(p.position);
+          const guardPos = this.v2.set(0.02, 1.2, 0.46 - this.shieldSpring.value * 0.05).applyQuaternion(this.yawQ).add(p.position);
           guardPos.y += p.motor.visualStepOffset;
-          this.q2.setFromEuler(new THREE.Euler(-0.12 - this.shieldSpring.value * 0.08, yaw, 0.1, 'YXZ'));
+          this.q2.setFromEuler(new THREE.Euler(-0.08 - this.shieldSpring.value * 0.08, yaw - 0.18, 0.06, 'YXZ'));
           this.v.lerp(guardPos, g);
           this.q.slerp(this.q2, g);
           sh.root.position.copy(this.v);

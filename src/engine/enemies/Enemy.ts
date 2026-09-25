@@ -476,6 +476,8 @@ export class Enemy implements Damageable, Threat {
     a.speed = this.state === 'hurt' || this.state === 'stagger' ? 0 : Math.hypot(v.x, v.z);
     a.runSpeed = 3.6;
     a.walkSpeed = 1.8;
+    a.ready = 1;
+    a.hasShieldUp = this.shielded;
     a.moveAngle = a.speed > 0.2 ? angleDelta(this.facing, dirToYaw(v.x, v.z)) : 0;
     a.strafing = this.state === 'strafe' || this.state === 'windup';
     a.grounded = m.grounded;

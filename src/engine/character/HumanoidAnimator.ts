@@ -51,6 +51,9 @@ export interface AnimInput {
   bowDraw: number;
   aimPitch: number;
   exhausted: boolean;
+  /** 1 = arma em mãos (idle de combate), 0 = relaxado. */
+  ready?: number;
+  hasShieldUp?: boolean;
   sprinting: boolean;
   /** Mão direita livre para balançar (sem IK de ataque)? */
   twoHandedIdle?: boolean;
@@ -81,6 +84,7 @@ export class HumanoidAnimator {
   private wasGrounded = true;
   private airVy = 0;
   private squash = 1;
+  private readyW = 0;
   private runW = 0;
   private hipYawS = 0;
   /** Mola de recuo (usada ao bater/bloquear): empurra tronco e braços. */
@@ -197,13 +201,60 @@ export class HumanoidAnimator {
     //     correr sobe na fase de voo
     let bob = (Math.abs(cs) - 1) * 0.028 * W + Math.abs(cs) * 0.08 * R - 0.05 * R;
 
-    // parado: respiração e peso
+    // ---------------------------------------------------------------- parado (idle)
     const idle = 1 - moving;
+    this.readyW = damp(this.readyW, s.ready ?? 0, 6, dt);
+    const rdy = this.readyW * idle * (1 - s.guard), rlx = (1 - this.readyW) * idle * (1 - s.guard);
     const breathe = Math.sin(this.t * (s.exhausted ? 6 : 2.1));
     P.chest.x += breathe * (s.exhausted ? 0.06 : 0.025) * idle;
     P.upperArmR.z -= breathe * 0.02 * idle;
     P.upperArmL.z += breathe * 0.02 * idle;
-    P.pelvis.z += Math.sin(this.t * 0.7) * 0.02 * idle;
+
+    // RELAXADO: pés afastados, peso num lado (o outro joelho solto), troca de lado devagar,
+    // braços levemente dobrados e a cabeça olhando em volta de vez em quando
+    if (rlx > 0.001) {
+      const shift = Math.sin(this.t * 0.45); // -1..1: lado do peso
+      const wR = 0.5 + 0.5 * shift, wL = 1 - wR;
+      P.pelvis.z += shift * 0.06 * rlx;
+      P.spine.z += -shift * 0.05 * rlx;
+      P.thighR.z += (-0.08 - 0.04 * wL) * rlx;
+      P.thighL.z += (0.08 + 0.04 * wR) * rlx;
+      // perna sem peso: joelho solto e pé levemente à frente
+      P.thighR.x += -0.1 * wL * rlx; P.shinR.x += 0.22 * wL * rlx; P.footR.x -= 0.1 * wL * rlx;
+      P.thighL.x += -0.1 * wR * rlx; P.shinL.x += 0.22 * wR * rlx; P.footL.x -= 0.1 * wR * rlx;
+      P.upperArmR.z += -0.1 * rlx; P.upperArmL.z += 0.1 * rlx;
+      P.upperArmR.x += 0.05 * rlx; P.upperArmL.x += 0.05 * rlx;
+      P.forearmR.x += -0.22 * rlx; P.forearmL.x += -0.22 * rlx;
+      // olhar em volta: pausas longas, viradas suaves
+      const look = Math.sin(this.t * 0.31) * Math.max(0, Math.sin(this.t * 0.17));
+      P.head.y += look * 0.55 * rlx;
+      P.neck.y += look * 0.15 * rlx;
+      P.head.x += (Math.sin(this.t * 0.23) * 0.06 - 0.02) * rlx;
+    }
+    // PRONTO (arma em mãos): perna esquerda à frente, joelhos dobrados, ombro esquerdo adiantado,
+    // arma baixa apontada para frente e escudo junto ao corpo; leve "respiração" nos joelhos
+    if (rdy > 0.001) {
+      const kb = Math.sin(this.t * 2.6) * 0.03;
+      P.thighL.x += -0.35 * rdy; P.shinL.x += (0.4 + kb) * rdy;
+      P.thighR.x += 0.28 * rdy; P.shinR.x += (0.42 + kb) * rdy;
+      P.thighL.z += 0.12 * rdy; P.thighR.z += -0.14 * rdy;
+      P.footR.x += -0.25 * rdy; P.footL.x += -0.1 * rdy;
+      P.pelvis.y += -0.35 * rdy;
+      P.spine.y += 0.2 * rdy; P.chest.y += 0.1 * rdy;
+      P.head.y += 0.12 * rdy;
+      P.spine.x += 0.1 * rdy;
+      // braço da arma: à frente e baixo
+      P.upperArmR.x += -0.55 * rdy; P.upperArmR.z += -0.18 * rdy;
+      P.forearmR.x += -0.55 * rdy;
+      // braço do escudo: dobrado à frente do corpo
+      if (s.hasShieldUp) {
+        P.upperArmL.x += -0.4 * rdy; P.upperArmL.z += 0.25 * rdy;
+        P.forearmL.x += -1.0 * rdy;
+      } else {
+        P.upperArmL.x += -0.25 * rdy; P.upperArmL.z += 0.2 * rdy; P.forearmL.x += -0.6 * rdy;
+      }
+      bob -= (0.07 + kb) * rdy;
+    }
     if (s.exhausted) {
       P.spine.x += 0.3 * idle;
       P.head.x -= 0.1;
@@ -260,12 +311,25 @@ export class HumanoidAnimator {
     // ---------------------------------------------------------------- defesa
     const g = s.guard;
     if (g > 0.01) {
+      // escudo erguido (IK finaliza o braço esquerdo): base baixa com perna esquerda à frente,
+      // ombro esquerdo adiantado, cabeça "espiando" por cima do escudo
       P.upperArmL.x = lerp(P.upperArmL.x, -1.25, g);
       P.upperArmL.z = lerp(P.upperArmL.z, 0.35, g);
       P.upperArmL.y = lerp(0, -0.5, g);
       P.forearmL.x = lerp(P.forearmL.x, -1.2, g);
-      P.spine.x += g * 0.12;
-      P.head.x += g * 0.05;
+      const st = g * idle; // base só parado (andando com escudo mantém o passo)
+      P.thighL.x += -0.3 * st; P.shinL.x += 0.35 * st;
+      P.thighR.x += 0.3 * st; P.shinR.x += 0.35 * st;
+      P.thighR.z += -0.12 * st; P.thighL.z += 0.1 * st;
+      P.pelvis.y += -0.3 * g;
+      P.spine.y += 0.18 * g; P.chest.y += 0.08 * g;
+      P.head.y += 0.1 * g;
+      P.spine.x += g * 0.2;
+      P.head.x += -g * 0.1;
+      // espada recolhida na lateral, apontando para frente (pronta para contra-atacar)
+      P.upperArmR.x = lerp(P.upperArmR.x, 0.05, g);
+      P.upperArmR.z = lerp(P.upperArmR.z, -0.35, g);
+      P.forearmR.x = lerp(P.forearmR.x, -1.15, g);
     }
 
     // ---------------------------------------------------------------- ações
