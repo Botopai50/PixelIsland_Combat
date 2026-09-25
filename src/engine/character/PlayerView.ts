@@ -207,6 +207,13 @@ export class PlayerView {
         }
         this.hand.applyQuaternion(this.yawQ).add(p.position);
         this.hand.y += p.motor.visualStepOffset;
+        if (def.id === 'swordAir') {
+          // golpe aéreo: a arma parte do OMBRO DE VERDADE (o corpo agacha/inclina
+          // na pancada) — fica grudada na mão em vez de ficar no ar
+          const logicSh = this.v.copy(pivot).applyQuaternion(this.yawQ).add(p.position);
+          rig.joints.upperArmR.getWorldPosition(this.v2);
+          this.hand.add(this.v2.sub(logicSh));
+        }
         this.dir.applyQuaternion(this.yawQ);
         this.edge.applyQuaternion(this.yawQ);
         weaponBasis(this.dir, this.edge, this.q);
