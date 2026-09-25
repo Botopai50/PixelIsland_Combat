@@ -175,9 +175,20 @@ export class PlayerView {
         let angle = p.swingAngle;
         if (p.state === 'charge') {
           const sgn = Math.sign(def.arc[1] - def.arc[0]) || 1;
-          angle = def.arc[0] - sgn * 22 + Math.sin(p.time * 40) * 2 * clamp01(p.chargeT / T.chargeTime);
+          const tremble = Math.sin(p.time * 40) * 2 * clamp01(p.chargeT / T.chargeTime);
+          // ferramentas: erguidas para trás (machado sobre o ombro, picareta acima
+          // da cabeça) — passar do início do arco as fazia atravessar o corpo
+          if (def.work === 'mine') angle = 128 + tremble;
+          else if (def.work === 'chop') angle = 118 + tremble;
+          else angle = def.arc[0] - sgn * 22 + tremble;
         }
         swingDirLocal(def, angle, this.dir, this.edge, p.state === 'attack' ? p.attack?.aimPitch ?? 0 : 0);
+        if (p.state === 'charge' && def.work === 'chop') {
+          // machado carregando: erguido por cima do ombro direito, lâmina para a frente
+          const tr = Math.sin(p.time * 40) * 0.03 * clamp01(p.chargeT / T.chargeTime);
+          this.dir.set(-0.38 + tr, 0.82, -0.42).normalize();
+          this.edge.set(0.25, 0.1, 1).normalize();
+        }
         const { pivot, reach } = pivotFor(def);
         this.hand.copy(pivot).addScaledVector(this.dir, reach).applyQuaternion(this.yawQ).add(p.position);
         this.hand.y += p.motor.visualStepOffset;

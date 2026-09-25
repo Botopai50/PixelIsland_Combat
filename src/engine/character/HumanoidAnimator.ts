@@ -56,6 +56,9 @@ export interface AnimInput {
   climbPhase?: number;
   climbMove?: number;
   climbJump?: number;
+  /** Direção na parede (x: + direita, y: + cima). */
+  climbDirX?: number;
+  climbDirY?: number;
   /** Acabou de agarrar (0..1) e cansaço na parede (0..1). */
   climbGrab?: number;
   climbTired?: number;
@@ -626,8 +629,39 @@ export class HumanoidAnimator {
         P.shinR.x = 1.15 + 0.5 * pullL - 0.3 * pullR + 0.6 * gather - 0.7 * launch + 0.3 * gr + shake;
         P.shinL.x = 1.15 + 0.5 * pullR - 0.3 * pullL + 0.6 * gather - 0.7 * launch + 0.3 * gr - shake;
         P.footR.x = -0.35; P.footL.x = -0.35;
+        // ---- por direção
+        const dx = clamp(s.climbDirX ?? 0, -1, 1), dy = clamp(s.climbDirY ?? 1, -1, 1);
+        const wDown = Math.max(0, -dy) * mv, wSide = Math.abs(dx) * mv;
+        // DESCENDO: olha para baixo, mãos descem (menos altas), pernas esticam
+        // procurando apoio embaixo, corpo afasta um pouco da parede
+        if (wDown > 0.001) {
+          P.head.x += 0.75 * wDown;
+          P.upperArmR.x += 0.75 * wDown; P.upperArmL.x += 0.75 * wDown;
+          P.forearmR.x -= 0.35 * wDown; P.forearmL.x -= 0.35 * wDown;
+          P.thighR.x += 0.45 * wDown * (1 + 0.6 * pullR); P.thighL.x += 0.45 * wDown * (1 + 0.6 * pullL);
+          P.shinR.x -= 0.5 * wDown; P.shinL.x -= 0.5 * wDown;
+          P.spine.x -= 0.12 * wDown;
+        }
+        // PARA OS LADOS: a mão da frente estica para o lado, a de trás recolhe;
+        // pernas abrem e fecham (passo lateral), corpo inclina e olha para lá
+        if (wSide > 0.001) {
+          const lead = Math.sign(dx);
+          const reach = 0.5 + 0.5 * Math.sin(cp); // mão da frente alcançando
+          const gatherS = 1 - reach;
+          const outR = lead > 0 ? reach : -0.4 * gatherS, outL = lead < 0 ? reach : -0.4 * gatherS;
+          P.upperArmR.z -= 0.9 * outR * wSide; P.upperArmL.z += 0.9 * outL * wSide;
+          P.upperArmR.x += 0.55 * Math.max(0, outR) * wSide; P.upperArmL.x += 0.55 * Math.max(0, outL) * wSide;
+          P.forearmR.x += 0.25 * Math.max(0, outR) * wSide; P.forearmL.x += 0.25 * Math.max(0, outL) * wSide;
+          // pernas: a do lado do movimento abre quando as mãos se juntam
+          const legR = lead > 0 ? gatherS : reach * 0.4, legL = lead < 0 ? gatherS : reach * 0.4;
+          P.thighR.z -= 0.5 * legR * wSide; P.thighL.z += 0.5 * legL * wSide;
+          P.thighR.x += 0.3 * legR * wSide; P.thighL.x += 0.3 * legL * wSide;
+          P.head.y -= lead * 0.55 * wSide;
+          P.spine.z -= lead * 0.1 * wSide;
+          targetBodyRotZ += lead * 0.1 * wSide;
+        }
         // corpo: sobe na puxada, agacha na preparação, cede ao agarrar
-        bodyYOffset = 0.05 * effort - 0.14 * gather - 0.12 * gr;
+        bodyYOffset = 0.05 * effort * (1 - wDown) - 0.14 * gather - 0.12 * gr;
         break;
       }
       case 'mantle': {

@@ -122,6 +122,8 @@ export class PlayerController implements Damageable {
   climbPhase = 0;
   /** 0..1: quanto está se movendo na parede. */
   climbMove = 0;
+  /** Direção de movimento na parede (x: + direita, y: + cima), suavizada. */
+  readonly climbDir = new THREE.Vector2();
   /** Salto na parede (tempo restante). */
   climbJumpT = 0;
   private climbJumpDir = new THREE.Vector2();
@@ -566,6 +568,7 @@ export class PlayerController implements Damageable {
     }
     const moving = Math.hypot(vx, vy) > 0.1;
     this.climbMove = damp(this.climbMove, moving ? 1 : 0, 10, dt);
+    if (len > 0.2) this.climbDir.lerp(new THREE.Vector2(mx, my), 1 - Math.exp(-dt * 8));
     if (moving && this.climbJumpT <= 0) this.useStamina(9 * dt);
     if (this.stamina <= 0) {
       this.exhausted = true;
@@ -720,6 +723,9 @@ export class PlayerController implements Damageable {
       if (this.startAttack(ATTACKS[w.air]) && this.attack) {
         // golpe de salto: pulinho para ganhar altura e ERGUER a arma
         this.attack.air = true;
+        // segurar o botão depois do golpe aéreo não vira carga (sem espada "flutuando")
+        this.attackHeld = false;
+        this.attackPressAt = -1e9;
         const v = this.motor.velocity;
         v.y = Math.max(v.y, 3.2);
         this.airSpeed = Math.max(this.airSpeed * 0.9, 2.2);
@@ -1029,7 +1035,7 @@ export class PlayerController implements Damageable {
           if (this.cur() !== 'move') break;
         }
         // segurar ataque parado (sem golpe em andamento) → carga
-        if (this.attackHeld && this.weapon?.charged && this.time - this.attackPressAt > 0.3 && this.motor.grounded) {
+        if (this.attackHeld && this.weapon?.charged && this.time - this.attackPressAt > 0.3 && this.motor.grounded && this.landLagT <= 0) {
           this.startCharge();
           break;
         }
@@ -1086,6 +1092,11 @@ export class PlayerController implements Damageable {
         break;
       }
       case 'charge': {
+        // caiu/saiu do chão carregando: cancela (nada de arma parada no ar)
+        if (!this.motor.grounded && this.motor.timeSinceGrounded > 0.15) {
+          this.setState('move');
+          break;
+        }
         this.chargeT += dt;
         const full = this.chargeT >= T.chargeTime;
         this.chargeLoop?.set(clamp01(this.chargeT / T.chargeTime));
@@ -1552,6 +1563,8 @@ export class PlayerController implements Damageable {
     s.attackSpin = false;
     s.climbPhase = this.climbPhase;
     s.climbMove = this.climbMove;
+    s.climbDirX = this.climbDir.x;
+    s.climbDirY = this.climbDir.y;
     s.climbJump = this.state === 'climb' ? clamp01(this.climbJumpT / 0.32) - clamp01(this.climbGatherT / 0.16) : 0;
     s.climbGrab = clamp01(this.climbGrabT / 0.35);
     s.climbTired = this.state === 'climb' ? clamp01(1 - this.stamina / (this.ctx.tuning.staminaMax * 0.3)) : 0;
