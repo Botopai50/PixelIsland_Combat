@@ -232,7 +232,7 @@ export class Game {
     }
     if (inp.consume('spawn')) this.spawnEnemy();
     if (inp.consume('reset')) this.resetArena();
-    if (inp.consume('walkToggle')) this.hud.toast(inp.walkMode ? 'Modo andar' : 'Modo correr', 'info');
+    if (inp.consume('runToggle')) this.hud.toast(inp.runLock ? 'Correr travado (Z para soltar)' : 'Andando', 'info');
   }
 
   private frame() {

@@ -1,7 +1,7 @@
 /** Telas de início e ajuda (textos dos controles). */
 export const CONTROLS_DESKTOP: [string, string][] = [
-  ['W A S D', 'Mover (Z / Caps Lock: andar ↔ correr)'],
-  ['Shift', 'Disparada (gasta stamina)'],
+  ['W A S D', 'Andar'],
+  ['Shift', 'Correr (segure) · Z / Caps Lock trava a corrida'],
   ['Espaço', 'Pular (segure = mais alto)'],
   ['Botão esq. / J', 'Atacar · segure = ataque carregado · arco: puxar/soltar'],
   ['Botão dir. / K', 'Defender (no tempo certo = APARO) · cancela o arco'],
@@ -19,12 +19,13 @@ export const CONTROLS_DESKTOP: [string, string][] = [
 ];
 
 export const CONTROLS_TOUCH: [string, string][] = [
-  ['Lado esquerdo', 'Analógico: mover (leve = andar)'],
+  ['Lado esquerdo', 'Analógico: andar'],
   ['Lado direito', 'Arrastar: olhar/mirar'],
   ['Atacar', 'Toque = golpe · segure = carga · arco: segure e solte (arraste o botão para mirar)'],
   ['Defender', 'Segure para bloquear; toque no tempo certo = aparo'],
   ['Esquiva', 'Analógico para o lado = salto lateral · solto = mortal para trás'],
-  ['Pular / Correr', 'Ações de movimento'],
+  ['Correr', 'Liga/desliga a corrida'],
+  ['Pular', 'Salto (segure = mais alto)'],
   ['Travar', 'Lock-on no inimigo mais próximo'],
   ['Barra rápida', 'Toque para equipar'],
   ['Topo', '1ª/3ª, ombro, itens, inimigo, reset, juice on/off, ajustes'],

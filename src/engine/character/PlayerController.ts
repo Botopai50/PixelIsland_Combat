@@ -909,7 +909,7 @@ export class PlayerController implements Damageable {
     const v = m.velocity;
     const mag = Math.min(1, Math.hypot(inp.moveX, inp.moveY));
     const inYaw = this.inputYaw();
-    const wantSprint = inp.isHeld('sprint') && mag > 0.3 && !this.exhausted;
+    const wantSprint = (inp.isHeld('sprint') || inp.runLock) && mag > 0.3 && !this.exhausted;
 
     let maxSpeed = 0;
     let steer = true;
@@ -933,10 +933,10 @@ export class PlayerController implements Damageable {
             }
           }
         } else {
-          const runSp = mag < 0.55 ? T.walkSpeed * (mag / 0.55) : lerp(T.walkSpeed, T.runSpeed, (mag - 0.55) / 0.45);
-          maxSpeed = this.exhausted ? T.walkSpeed * 0.8 : runSp;
+          // dois estados claros: ANDAR (padrão) e CORRER (segurando Correr/Shift)
+          maxSpeed = T.walkSpeed * Math.min(1, mag / 0.8) * (this.exhausted ? 0.75 : 1);
           if (wantSprint && m.grounded) {
-            maxSpeed = T.sprintSpeed;
+            maxSpeed = T.runSpeed;
             this.sprinting = true;
             this.useStamina(T.sprintCost * dt);
             this.staminaDelay = 0.5;
@@ -955,7 +955,7 @@ export class PlayerController implements Damageable {
         faceMode = 'aim';
         break;
       case 'equip':
-        maxSpeed = T.runSpeed * 0.8;
+        maxSpeed = T.walkSpeed;
         faceMode = this.lockTarget ? 'lock' : 'move';
         break;
       case 'attack': {

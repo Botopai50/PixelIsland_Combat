@@ -6,7 +6,7 @@
 export type Action =
   | 'attack' | 'guard' | 'jump' | 'dodge' | 'sprint' | 'lock'
   | 'view' | 'shoulder' | 'inventory' | 'tweak' | 'spawn' | 'reset' | 'help'
-  | 'walkToggle' | 'nextItem' | 'prevItem' | 'juice'
+  | 'runToggle' | 'nextItem' | 'prevItem' | 'juice'
   | 'slot1' | 'slot2' | 'slot3' | 'slot4' | 'slot5' | 'slot6';
 
 export class Input {
@@ -27,7 +27,8 @@ export class Input {
   private keyMove = { f: 0, b: 0, l: 0, r: 0 };
   private touchMoveX = 0;
   private touchMoveY = 0;
-  walkMode = false;
+  /** Correr travado (Z / Caps Lock), sem precisar segurar Shift. */
+  runLock = false;
 
   setButton(a: Action, down: boolean) {
     if (down) {
@@ -81,11 +82,6 @@ export class Input {
       x /= len;
       y /= len;
     }
-    if (len > 0 && this.walkMode) {
-      // 0.55 = limite do analógico em que o personagem anda na velocidade de andar
-      x *= 0.55;
-      y *= 0.55;
-    }
     if (Math.abs(this.touchMoveX) + Math.abs(this.touchMoveY) > 0.001) {
       x = this.touchMoveX;
       y = this.touchMoveY;
@@ -114,7 +110,7 @@ export class Input {
       Space: 'jump', ShiftLeft: 'sprint', ShiftRight: 'sprint',
       KeyC: 'dodge', AltLeft: 'dodge', AltRight: 'dodge',
       KeyQ: 'lock', KeyV: 'view', KeyT: 'shoulder', Tab: 'inventory', KeyI: 'inventory',
-      KeyP: 'tweak', KeyB: 'juice', KeyG: 'spawn', KeyR: 'reset', KeyH: 'help', KeyZ: 'walkToggle', CapsLock: 'walkToggle',
+      KeyP: 'tweak', KeyB: 'juice', KeyG: 'spawn', KeyR: 'reset', KeyH: 'help', KeyZ: 'runToggle', CapsLock: 'runToggle',
       KeyJ: 'attack', KeyK: 'guard', KeyL: 'dodge',
       Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', Digit6: 'slot6',
     };
@@ -132,7 +128,7 @@ export class Input {
           return;
         }
         this.setButton(a, down);
-        if (down && a === 'walkToggle') this.walkMode = !this.walkMode;
+        if (down && a === 'runToggle') this.runLock = !this.runLock;
         e.preventDefault();
       }
     };

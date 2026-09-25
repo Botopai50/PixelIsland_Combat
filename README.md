@@ -39,8 +39,8 @@ itch.io, Netlify…).
 ### Teclado e mouse
 | Tecla | Ação |
 |---|---|
-| W A S D | Mover — correr por padrão · **Z** ou **Caps Lock** alterna para ANDAR (animação própria) |
-| Shift | Disparada (gasta stamina) |
+| W A S D | Andar (postura ereta) |
+| Shift (segurar) | Correr (curvado para frente, gasta stamina) · **Z** / **Caps Lock** trava a corrida |
 | Espaço | Pular — segurar = salto mais alto |
 | Botão esquerdo / J | Atacar · **segurar** = ataque carregado · com arco: puxar e soltar |
 | Botão direito / K | Defender · **no instante do golpe** = APARO · cancela o arco |
@@ -59,11 +59,12 @@ itch.io, Netlify…).
 ### Toque (celular)
 | Controle | Ação |
 |---|---|
-| Metade esquerda | Analógico dinâmico (pouca inclinação = andar) |
+| Metade esquerda | Analógico dinâmico: andar |
 | Metade direita | Arrastar para olhar/mirar |
 | Atacar | Toque = golpe · segurar = carga · arco: segurar e soltar (arraste o próprio botão para mirar) |
 | Defender | Segurar = bloquear · no tempo certo = aparo |
-| Pular / Esquiva / Correr / Travar | Ações de movimento e lock-on |
+| Correr | Liga/desliga a corrida (curvado para frente) |
+| Pular / Esquiva / Travar | Ações de movimento e lock-on |
 | Barra rápida | Toque para equipar (toque longo abre o inventário) |
 | Botões do topo | 1ª/3ª, ombro, itens, +inimigo, resetar, juice on/off, ajustes, ajuda |
 
@@ -102,7 +103,7 @@ A interface alterna sozinha entre modo toque e mouse conforme o dispositivo usad
 
 Todos os parâmetros têm efeito imediato e ficam salvos no navegador:
 
-- **Movimento**: velocidades, aceleração, desaceleração, controle no ar, giro, altura do salto,
+- **Movimento**: velocidade de andar e de correr, aceleração, desaceleração, controle no ar, giro, altura do salto,
   gravidade (subida/queda), corte do salto, tolerância de borda (*coyote time*), buffer de salto.
 - **Esquiva e stamina**: distância, duração, janela de invulnerabilidade, recarga, janela da
   esquiva perfeita, rajada on/off, custos de stamina.

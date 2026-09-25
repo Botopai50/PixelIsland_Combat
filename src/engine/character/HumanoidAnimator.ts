@@ -70,6 +70,7 @@ export class HumanoidAnimator {
   private wasGrounded = true;
   private airVy = 0;
   private squash = 1;
+  private runW = 0;
   /** Mola de recuo (usada ao bater/bloquear): empurra tronco e braços. */
   recoil = 0;
   private recoilV = 0;
@@ -93,11 +94,12 @@ export class HumanoidAnimator {
     const P = this.pose;
     for (const j of JOINTS) P[j].set(0, 0, 0);
     const speed = s.speed;
-    // peso da corrida: 0 até a velocidade de andar, 1 perto da de correr (transição curta)
-    const walkTop = (s.walkSpeed ?? 2.2) * 1.15;
-    const runStart = Math.max(walkTop + 0.25, s.runSpeed * 0.6);
-    const rr = clamp01((speed - walkTop) / (runStart - walkTop));
-    const run = rr * rr * (3 - 2 * rr);
+    // ANDAR x CORRER: estado explícito (botão Correr) ou velocidade bem acima da de andar.
+    // A mistura é rápida, mas suave, para a troca de postura ser bem visível.
+    const walkSp = s.walkSpeed ?? 2.2;
+    const wantRun = (s.sprinting || speed > walkSp * 1.45) && speed > 0.5 ? 1 : 0;
+    this.runW = damp(this.runW, wantRun, 9, dt);
+    const run = this.runW;
     const moving = clamp01(speed / 1.2);
 
     // ---------------------------------------------------------------- locomoção
@@ -117,7 +119,7 @@ export class HumanoidAnimator {
     //           quadril balança de lado, corpo desce no apoio duplo.
     //  CORRER — tronco inclinado, fase de voo (corpo sobe), joelhos altos,
     //           cotovelos a 90°, braços bombeando, quique forte.
-    const stride = lerp(1.25, 2.5, run) * (s.sprinting ? 1.1 : 1);
+    const stride = lerp(1.6, 2.7, run);
     if (s.grounded) this.phase += (dirSign * speed * dt) / stride;
     const ph = this.phase * TAU;
     const sn = Math.sin(ph), cs = Math.cos(ph);
@@ -140,7 +142,7 @@ export class HumanoidAnimator {
     P.spine.y = -hipYaw * 0.55;
     P.chest.y = -hipYaw * 0.35 - sn * (0.05 * W + 0.4 * R);
     P.spine.z = -sn * 0.07 * W;
-    P.spine.x = -0.04 * W + 0.5 * R + (s.sprinting ? 0.2 : 0) + (s.exhausted ? 0.25 : 0);
+    P.spine.x = -0.05 * W + 0.62 * R + (s.exhausted ? 0.25 : 0);
     P.head.x = -P.spine.x * 0.55 + 0.05 * W + Math.abs(cs) * 0.08 * R;
 
     // --- braços

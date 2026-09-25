@@ -7,8 +7,8 @@
 export interface Tuning {
   // Movimento
   walkSpeed: number;
+  /** Velocidade ao segurar Correr (Shift / botão Correr). */
   runSpeed: number;
-  sprintSpeed: number;
   acceleration: number;
   deceleration: number;
   airControl: number;
@@ -82,9 +82,8 @@ export interface Tuning {
 
 export function defaultTuning(): Tuning {
   return {
-    walkSpeed: 1.8,
-    runSpeed: 5.2,
-    sprintSpeed: 7.6,
+    walkSpeed: 2.6,
+    runSpeed: 6.6,
     acceleration: 38,
     deceleration: 46,
     airControl: 0.45,
@@ -106,7 +105,7 @@ export function defaultTuning(): Tuning {
 
     staminaMax: 100,
     staminaRegen: 32,
-    sprintCost: 18,
+    sprintCost: 10,
     dodgeCost: 12,
     chargeCost: 25,
 
@@ -175,7 +174,7 @@ export function rawPreset(t: Tuning): Partial<Tuning> {
   };
 }
 
-const KEY = 'pixelisland-combat.tuning.v2';
+const KEY = 'pixelisland-combat.tuning.v3';
 
 export function saveTuning(t: Tuning) {
   try {

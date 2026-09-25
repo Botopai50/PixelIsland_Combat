@@ -26,8 +26,8 @@ export class TweakPanel {
       'Juice: comparar (liga/desliga)': () => this.toggleJuice(),
       'Preset: Juicy (padrão)': () => this.apply(defaultTuning()),
       'Preset: Cru (sem efeitos)': () => this.apply({ ...this.t, ...rawPreset(this.t) }),
-      'Preset: Arcade rápido': () => this.apply({ ...this.t, runSpeed: 6.4, acceleration: 60, deceleration: 70, attackSpeedMul: 1.35, recoveryMul: 0.7, hitStopMul: 0.7, dodgeDuration: 0.28 }),
-      'Preset: Pesado/realista': () => this.apply({ ...this.t, runSpeed: 4.4, acceleration: 22, deceleration: 30, attackSpeedMul: 0.8, recoveryMul: 1.3, hitStopMul: 1.4, shakeMul: 1.3, cancelWindowMul: 1.6 }),
+      'Preset: Arcade rápido': () => this.apply({ ...this.t, runSpeed: 7.6, walkSpeed: 3.2, acceleration: 60, deceleration: 70, attackSpeedMul: 1.35, recoveryMul: 0.7, hitStopMul: 0.7, dodgeDuration: 0.28 }),
+      'Preset: Pesado/realista': () => this.apply({ ...this.t, runSpeed: 5.4, walkSpeed: 2.2, acceleration: 22, deceleration: 30, attackSpeedMul: 0.8, recoveryMul: 1.3, hitStopMul: 1.4, shakeMul: 1.3, cancelWindowMul: 1.6 }),
       'Salvar no navegador': () => saveTuning(this.t),
       'Copiar JSON': () => navigator.clipboard?.writeText(JSON.stringify(this.t, null, 2)),
     };
@@ -42,8 +42,7 @@ export class TweakPanel {
     };
     const mv = f('Movimento', false);
     mv.add(t, 'walkSpeed', 0.5, 5, 0.1).name('Andar (m/s)');
-    mv.add(t, 'runSpeed', 2, 10, 0.1).name('Correr (m/s)');
-    mv.add(t, 'sprintSpeed', 3, 14, 0.1).name('Disparada (m/s)');
+    mv.add(t, 'runSpeed', 2, 12, 0.1).name('Correr — Shift (m/s)');
     mv.add(t, 'acceleration', 5, 120, 1).name('Aceleração');
     mv.add(t, 'deceleration', 5, 140, 1).name('Desaceleração');
     mv.add(t, 'airControl', 0, 1, 0.05).name('Controle no ar');
@@ -65,7 +64,7 @@ export class TweakPanel {
     dg.add(t, 'flurryEnabled').name('Rajada após esquiva perfeita');
     dg.add(t, 'staminaMax', 30, 300, 5).name('Stamina máx.');
     dg.add(t, 'staminaRegen', 5, 100, 1).name('Regeneração/s');
-    dg.add(t, 'sprintCost', 0, 60, 1).name('Custo disparada/s');
+    dg.add(t, 'sprintCost', 0, 60, 1).name('Custo de correr/s');
     dg.add(t, 'dodgeCost', 0, 50, 1).name('Custo esquiva');
 
     const cb = f('Combate', false);
