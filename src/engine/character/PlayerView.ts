@@ -356,8 +356,14 @@ export class PlayerView {
       const hand = side === 1 ? rig.joints.handR : rig.joints.handL;
       const t = this.climbT;
       if (mantle) {
-        // na borda: afastadas na largura dos ombros, um pouco para dentro do topo
+        // na borda: afastadas na largura dos ombros, um pouco para dentro do topo;
+        // quando o corpo passa por cima, as mãos acompanham (empurram ao lado do corpo)
         t.set(w.x + rx * 0.22 * side - n.x * 0.08, w.y + 0.03, w.z + rz * 0.22 * side - n.z * 0.08);
+        const follow = Math.min(1, Math.max(0, (u - 0.45) / 0.3));
+        if (follow > 0) {
+          t.x += (p.position.x - n.x * 0.3 + rx * 0.24 * side - t.x) * follow;
+          t.z += (p.position.z - n.z * 0.3 + rz * 0.24 * side - t.z) * follow;
+        }
       } else {
         hand.getWorldPosition(t);
         // projeta no plano da parede (encosta a palma)

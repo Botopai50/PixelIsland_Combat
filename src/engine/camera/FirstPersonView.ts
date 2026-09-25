@@ -347,7 +347,8 @@ export class FirstPersonView {
     for (const [, m] of this.models) m.root.visible = false;
     this.shield.root.visible = false;
     const k = this.climbHide;
-    if (k < 0.5 && p.state !== 'climb' && p.state !== 'mantle') {
+    // terminou a escalada/subida: braços saem na hora (nada fica "preso" na borda)
+    if (p.state !== 'climb' && p.state !== 'mantle') {
       this.armR.visible = this.armL.visible = false;
       return;
     }
@@ -364,9 +365,16 @@ export class FirstPersonView {
     for (const side of [1, -1] as const) {
       const t = this.cw;
       if (mantle) {
-        // em cima da borda; no fim (levantando) as mãos saem por baixo
+        // em cima da borda; quando o corpo passa por cima as mãos vêm junto
+        // (empurrando o chão ao lado do corpo) e no fim saem por baixo
         t.set(w.x + rx * 0.2 * side - n.x * 0.2, w.y + 0.03, w.z + rz * 0.2 * side - n.z * 0.2);
-        t.y -= Math.max(0, (u - 0.8) / 0.2) * 0.5;
+        const follow = Math.min(1, Math.max(0, (u - 0.45) / 0.3));
+        if (follow > 0) {
+          const fx = -n.x, fz = -n.z;
+          t.x += (p.position.x + fx * 0.32 + rx * 0.2 * side - t.x) * follow;
+          t.z += (p.position.z + fz * 0.32 + rz * 0.2 * side - t.z) * follow;
+        }
+        t.y -= Math.max(0, (u - 0.75) / 0.25) * 0.6;
       } else {
         const a = Math.sin(cp) * mv * side; // + = esta mão alta
         const rising = Math.max(0, Math.cos(cp) * side) * mv; // esta mão subindo: desgruda
@@ -386,10 +394,19 @@ export class FirstPersonView {
           t.z -= n.z * 0.1;
         }
       }
+      // cotovelo calculado no MUNDO a partir de um ombro de verdade (fica certo
+      // olhando para cima, para frente ou para baixo)
+      const sh = this.ce.set(p.position.x + rx * 0.2 * side + n.x * 0.05, p.position.y + 1.4, p.position.z + rz * 0.2 * side + n.z * 0.05);
+      const e = sh.lerp(t, 0.5);
+      // cotovelo um pouco para fora e para TRÁS (em direção ao corpo)
+      e.x += rx * side * 0.05 + n.x * 0.14;
+      e.z += rz * side * 0.05 + n.z * 0.14;
+      e.y -= 0.1;
       t.applyMatrix4(this.camInv);
+      e.applyMatrix4(this.camInv);
       // entra/sai de baixo da tela
       t.y -= (1 - k) * 0.6;
-      const e = this.ce.set(t.x + side * 0.16, t.y - 0.36, t.z + 0.3);
+      e.y -= (1 - k) * 0.6;
       this.placeArm(side === 1 ? this.armR : this.armL, t.clone(), side, e);
     }
   }
