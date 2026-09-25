@@ -35,6 +35,8 @@ export class CameraRig implements AimSource {
   private leanSm = new THREE.Vector3();
   private juice: CameraJuice;
   private runSway = 0;
+  private keepAimT = 0;
+  private keepAimPt = new THREE.Vector3();
   private tmp2 = new THREE.Vector3();
   private dir = new THREE.Vector3();
   private raycaster = new THREE.Raycaster();
@@ -56,10 +58,21 @@ export class CameraRig implements AimSource {
   }
 
   toggleView() {
+    this.holdAim();
     this.mode = this.mode === 'first' ? 'third' : 'first';
   }
   toggleShoulder() {
+    this.holdAim();
     this.shoulderSide *= -1;
+  }
+  /**
+   * Ao trocar de câmera (1ª/3ª, ombro) a mira continua no MESMO ponto do mundo:
+   * as câmeras ficam em lugares diferentes, então o mesmo yaw/pitch apontaria
+   * para outro lugar (paralaxe). Durante a transição o ângulo é corrigido.
+   */
+  private holdAim() {
+    const pt = this.aimPoint(this.keepAimPt);
+    this.keepAimT = pt.distanceTo(this.camera.position) < 90 ? 0.45 : 0;
   }
   recenter() {
     this.recenterT = 0.25;
@@ -201,6 +214,17 @@ export class CameraRig implements AimSource {
     this.landDip.update(Math.max(realDt, 1 / 240));
     const cam = this.camera;
     cam.position.copy(thirdPos).lerp(eye, b);
+    if (this.keepAimT > 0) {
+      // aponta a câmera (já na posição nova) para o ponto que estava na mira;
+      // a posição depende do ângulo, então converge ao longo da transição
+      this.keepAimT -= realDt;
+      if (p.lockTarget || p.state === 'dead') this.keepAimT = 0;
+      const d = this.tmp2.subVectors(this.keepAimPt, cam.position);
+      if (d.lengthSq() > 0.25) {
+        this.yaw = Math.atan2(d.x, d.z);
+        this.pitch = clamp(Math.atan2(d.y, Math.hypot(d.x, d.z)), -1.3, this.blend > 0.5 ? 1.45 : 1.05);
+      }
+    }
 
     // ------------------------------------------------ FOV
     let kick = 0;
