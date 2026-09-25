@@ -232,16 +232,17 @@ export class FirstPersonView {
         model.root.quaternion.copy(this.restQ);
         model.root.rotateX(-this.kick.value * 0.1);
         const g = p.guardAmount;
-        if (main === 'sword' && g > 0.01) {
+        if (main === 'sword' && p.hasShield && g > 0.01) {
           // defendendo: espada abaixada ao lado, fora do caminho do escudo
           const gp = this.v2.set(0.36, -0.4, -0.42).add(offset);
           const gq = weaponBasis(this.dir.set(0.35, 0.45, -0.82).normalize(), this.edge.set(-0.6, 0.3, -0.3).normalize(), new THREE.Quaternion());
           model.root.position.lerp(gp, g);
           model.root.quaternion.slerp(gq, g);
         }
-        if ((main === 'axe' || main === 'pickaxe') && g > 0.01) {
-          // defesa com ferramenta: cabo atravessado na frente da câmera
-          const gp = this.v2.set(0.24, -0.2, -0.42).add(offset);
+        const swordGuard = main === 'sword' && !p.hasShield;
+        if ((main === 'axe' || main === 'pickaxe' || swordGuard) && g > 0.01) {
+          // defesa com ferramenta/espada sem escudo: atravessada na frente da câmera
+          const gp = this.v2.set(0.24, swordGuard ? -0.16 : -0.2, -0.42).add(offset);
           gp.z += this.shieldKick.value * 0.04;
           const gq = weaponBasis(this.dir.set(-1, 0.28, -0.1).normalize(), this.edge.set(0, 1, 0.2).normalize(), new THREE.Quaternion());
           model.root.position.lerp(gp, g);
@@ -255,6 +256,11 @@ export class FirstPersonView {
       if (work || main === 'axe' || main === 'pickaxe') {
         // pegada de duas mãos no cabo
         const g = this.v2.set(0, TWO_HAND_GRIP * aspectK, 0).applyQuaternion(model.root.quaternion).add(model.root.position);
+        this.placeArm(this.armL, g.clone(), -1);
+      }
+      if (main === 'sword' && !p.hasShield && p.guardAmount > 0.3 && !def) {
+        // defesa sem escudo: mão esquerda apoiada na lâmina
+        const g = this.v2.set(0, 0.5 * T.rangeMul * aspectK, 0).applyQuaternion(model.root.quaternion).add(model.root.position);
         this.placeArm(this.armL, g.clone(), -1);
       }
       const charge = p.state === 'charge' ? clamp01(p.chargeT / T.chargeTime) : 0;

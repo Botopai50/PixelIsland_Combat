@@ -239,11 +239,13 @@ export class PlayerView {
         model.root.quaternion.copy(this.q).multiply(REST_WEAPON);
         if (this.weaponSpring.value !== 0) model.root.rotateX(-this.weaponSpring.value * 0.1);
         const g = p.guardAmount;
-        if ((main === 'axe' || main === 'pickaxe') && g > 0.01) {
-          // defesa com ferramenta: cabo na horizontal à frente do peito, duas mãos
-          const hand = this.v2.set(-0.22, 1.3 - this.shieldSpring.value * 0.03, 0.38).applyQuaternion(this.yawQ).add(p.position);
+        const swordGuard = main === 'sword' && !p.hasShield;
+        if ((main === 'axe' || main === 'pickaxe' || swordGuard) && g > 0.01) {
+          // defesa com ferramenta/espada sem escudo: arma na horizontal à frente
+          // do peito, duas mãos (espada: mão esquerda apoiada na lâmina, gume para cima)
+          const hand = this.v2.set(swordGuard ? -0.26 : -0.22, (swordGuard ? 1.36 : 1.3) - this.shieldSpring.value * 0.03, swordGuard ? 0.34 : 0.38).applyQuaternion(this.yawQ).add(p.position);
           hand.y += p.motor.visualStepOffset;
-          const dir = this.dir.set(1, 0.3, 0.1).normalize().applyQuaternion(this.yawQ);
+          const dir = this.dir.set(1, swordGuard ? 0.22 : 0.3, swordGuard ? 0.18 : 0.1).normalize().applyQuaternion(this.yawQ);
           const edge = this.edge.set(0, 1, 0);
           weaponBasis(dir, edge, this.q2);
           model.root.position.lerp(hand, g);
@@ -251,7 +253,7 @@ export class PlayerView {
           rig.joints.upperArmR.getWorldPosition(this.pole);
           this.pole.add(this.v.set(-Math.cos(yaw) * 0.5, -0.6, Math.sin(yaw) * 0.5));
           solveTwoBoneIK(rig.joints.upperArmR, rig.joints.forearmR, ARM_UPPER, ARM_FORE, model.root.position, this.pole, g);
-          const grip = this.v.copy(dir).multiplyScalar(0.45).add(model.root.position);
+          const grip = this.v.copy(dir).multiplyScalar(swordGuard ? 0.55 : 0.45).add(model.root.position);
           rig.joints.upperArmL.getWorldPosition(this.pole);
           this.pole.add(this.hand.set(Math.cos(yaw) * 0.5, -0.6, -Math.sin(yaw) * 0.5));
           solveTwoBoneIK(rig.joints.upperArmL, rig.joints.forearmL, ARM_UPPER, ARM_FORE, grip, this.pole, g);
