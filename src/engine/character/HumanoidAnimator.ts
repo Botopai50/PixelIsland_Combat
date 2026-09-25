@@ -337,11 +337,11 @@ export class HumanoidAnimator {
     this.sneakW = damp(this.sneakW, s.sneak && s.action !== 'dodge' ? 1 : 0, 8, dt);
     const sk = this.sneakW;
     if (sk > 0.001) {
-      P.thighR.x -= 0.75 * sk; P.thighL.x -= 0.75 * sk;
-      P.shinR.x += 1.15 * sk; P.shinL.x += 1.15 * sk;
-      P.footR.x -= 0.35 * sk; P.footL.x -= 0.35 * sk;
-      P.spine.x += 0.45 * sk; P.chest.x += 0.1 * sk;
-      P.head.x -= 0.4 * sk;
+      P.thighR.x -= 1.1 * sk; P.thighL.x -= 1.1 * sk;
+      P.shinR.x += 1.7 * sk; P.shinL.x += 1.7 * sk;
+      P.footR.x -= 0.6 * sk; P.footL.x -= 0.6 * sk;
+      P.spine.x += 0.55 * sk; P.chest.x += 0.12 * sk;
+      P.head.x -= 0.5 * sk;
       P.upperArmR.x -= 0.3 * sk; P.upperArmL.x -= 0.3 * sk;
       P.upperArmR.z -= 0.22 * sk; P.upperArmL.z += 0.22 * sk;
       P.forearmR.x -= 0.8 * sk; P.forearmL.x -= 0.8 * sk;
@@ -693,6 +693,6 @@ export class HumanoidAnimator {
     const sy = 1 + stretch - li * 0.16;
     this.squash = damp(this.squash, sy, 25, dt);
     b.scale.set(1 / Math.sqrt(this.squash), this.squash, 1 / Math.sqrt(this.squash));
-    b.position.y = this.rig.bodyPivotY + this.bodyY - li * 0.2 - cr * 0.12 - this.sneakW * 0.17 + bob;
+    b.position.y = this.rig.bodyPivotY + this.bodyY - li * 0.2 - cr * 0.12 - this.sneakW * 0.32 + bob;
   }
 }
