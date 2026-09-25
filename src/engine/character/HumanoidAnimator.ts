@@ -380,9 +380,9 @@ export class HumanoidAnimator {
           const low = Math.max(wind, spin);
           P.thighR.z = -0.34 * low; P.thighL.z = 0.34 * low;
           P.thighR.x = 0.05 - 0.2 * low; P.thighL.x = -0.3 * low;
-          P.shinR.x = 0.65 * low; P.shinL.x = 0.6 * low;
+          P.shinR.x = 0.65 * low + 0.2 * spin; P.shinL.x = 0.6 * low + 0.2 * spin;
           P.footR.x = -0.3 * low; P.footL.x = -0.2 * low;
-          bodyYOffset -= 0.16 * low;
+          bodyYOffset -= 0.16 * low + 0.06 * spin;
           // carga: torce para a direita, olhar fica à frente, braço do escudo à frente
           P.pelvis.y += -0.25 * wind;
           P.spine.y += -0.55 * wind; P.chest.y += -0.35 * wind;
@@ -390,12 +390,22 @@ export class HumanoidAnimator {
           P.spine.x += 0.3 * wind + 0.28 * spin;
           P.upperArmL.x += -0.7 * wind; P.upperArmL.z += 0.35 * wind;
           P.forearmL.x -= 0.4 * wind;
-          // giro: cabeça adianta, corpo inclina para dentro, braço aberto
-          P.head.y += 0.35 * spin;
-          P.chest.y += 0.2 * spin;
-          targetBodyRotZ += 0.16 * spin;
-          P.upperArmL.z += 0.65 * spin; P.upperArmL.x += -0.1 * spin;
-          P.forearmL.x -= 0.35 * spin;
+          // giro: cabeça adianta, peito puxa, corpo inclina para dentro
+          P.head.y += 0.4 * spin;
+          P.chest.y += 0.25 * spin;
+          P.spine.z += 0.12 * spin;
+          targetBodyRotZ += 0.26 * spin;
+          // braço do escudo ARRASTADO para trás e para fora (contrapeso, não cobre o corpo)
+          P.upperArmL.z += 0.75 * spin; P.upperArmL.x += 0.75 * spin;
+          P.forearmL.x -= 0.25 * spin;
+          // passinhos de pivô: a cada meia volta um pé sobe e reposiciona
+          if (spin > 0.05) {
+            const st = Math.sin(s.spinYaw * 2);
+            const up = Math.max(0, st), dn = Math.max(0, -st);
+            P.thighR.x += -0.35 * up * spin; P.shinR.x += 0.5 * up * spin;
+            P.thighL.x += -0.35 * dn * spin; P.shinL.x += 0.5 * dn * spin;
+            bodyYOffset += 0.03 * Math.abs(st) * spin;
+          }
           targetBodyYaw = s.spinYaw;
           break;
         }
