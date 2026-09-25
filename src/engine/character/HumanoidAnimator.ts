@@ -173,28 +173,29 @@ export class HumanoidAnimator {
     P.footL.x = bl(wFootL, rFootL);
 
     // --- quadril e tronco (andar: giro suave do quadril compensado pelo peito)
-    P.pelvis.y = hipYaw + sn * bl(0.1, 0.28);
+    P.pelvis.y = hipYaw + sn * bl(0.1, 0.1);
     P.pelvis.z = sn * 0.045 * W;
     P.spine.y = -hipYaw * 0.55;
-    P.chest.y = -hipYaw * 0.35 - sn * bl(0.14, 0.4);
+    P.chest.y = -hipYaw * 0.35 - sn * bl(0.14, 0.12);
     P.spine.z = -sn * 0.035 * W;
     P.spine.x = bl(0.03, 0.62) + (s.exhausted ? 0.25 : 0);
     P.chest.x += 0.08 * R;
-    P.head.x = -P.spine.x * 0.65 + Math.abs(cs) * 0.08 * R;
-    P.head.y = sn * 0.06 * W; // cabeça compensa o giro do tronco (olhar estável)
+    P.head.x = -P.spine.x * 0.7;
+    // cabeça compensa o giro do tronco (olhar estável, apontando à frente)
+    P.head.y = sn * 0.06 * W - P.chest.y * 0.8 * R;
 
     // --- braços (andar: pendulares, cotovelo dobra mais quando o braço vai à frente)
     // correr: braços bombeando forte, cotovelos dobrados
-    P.upperArmR.x = sn * bl(0.42, 1.35) - 0.2 * R;
-    P.upperArmL.x = -sn * bl(0.42, 1.35) - 0.2 * R;
-    P.upperArmR.z = -0.07 * W - 0.3 * R - 0.05 * (1 - moving);
-    P.upperArmL.z = 0.07 * W + 0.3 * R + 0.05 * (1 - moving);
+    P.upperArmR.x = sn * bl(0.42, 1.25) - 0.2 * R;
+    P.upperArmL.x = -sn * bl(0.42, 1.25) - 0.2 * R;
+    P.upperArmR.z = -0.07 * W - 0.13 * R - 0.05 * (1 - moving);
+    P.upperArmL.z = 0.07 * W + 0.13 * R + 0.05 * (1 - moving);
     P.forearmR.x = -bl(0.18 + pos(-sn) * 0.4, 1.6 + pos(-sn) * 0.35) - 0.1 * (1 - moving);
     P.forearmL.x = -bl(0.18 + pos(sn) * 0.4, 1.6 + pos(sn) * 0.35) - 0.1 * (1 - moving);
 
     // --- sobe e desce: andar é mais alto com a perna vertical e desce no apoio duplo;
     //     correr sobe na fase de voo
-    let bob = (Math.abs(cs) - 1) * 0.028 * W + Math.abs(cs) * 0.13 * R - 0.06 * R;
+    let bob = (Math.abs(cs) - 1) * 0.028 * W + Math.abs(cs) * 0.08 * R - 0.05 * R;
 
     // parado: respiração e peso
     const idle = 1 - moving;
