@@ -188,8 +188,8 @@ export class CameraRig implements AimSource {
     if (b >= 0.5 && p.motor.grounded) this.bobPhase += (speed * playerDt) / 1.9;
     const bobAmt = T.camBob ? T.camBobAmount * clamp01(speed / 6) : 0;
     const eye = new THREE.Vector3(0, EYE.y, EYE.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), p.facing).add(p.position);
-    eye.y += vis + Math.abs(Math.sin(this.bobPhase * Math.PI * 2)) * 0.045 * bobAmt + this.landDip.value * 0.05;
-    eye.addScaledVector(right, Math.sin(this.bobPhase * Math.PI * 2) * 0.02 * bobAmt);
+    eye.y += vis + Math.abs(Math.sin(this.bobPhase * Math.PI * 2)) * 0.018 * bobAmt + this.landDip.value * 0.05;
+    eye.addScaledVector(right, Math.sin(this.bobPhase * Math.PI * 2) * 0.008 * bobAmt);
     if (p.state === 'dodge') eye.y -= Math.sin(clamp01(p.stateT / 0.35) * Math.PI) * (p.dodgeType === 'flip' ? 0.25 : 0.12);
     if (p.state === 'dead') eye.y -= clamp01(p.stateT) * 1.2;
 
@@ -225,9 +225,9 @@ export class CameraRig implements AimSource {
     // 3ª pessoa correndo: balanço leve (rola + acena), menor que na 1ª
     const sw = this.runSway * (T.camBob ? T.camBobAmount : 0) * lerp(0.35, 1, b);
     const ph = this.bobPhase * Math.PI * 2;
-    const swRoll = Math.sin(ph) * 0.013 * sw;
-    const swPitch = (Math.abs(Math.cos(ph)) - 0.64) * 0.014 * sw;
-    const swYaw = Math.sin(ph) * 0.004 * sw;
+    const swRoll = Math.sin(ph) * lerp(0.013, 0.007, b) * sw;
+    const swPitch = (Math.abs(Math.cos(ph)) - 0.64) * lerp(0.014, 0.006, b) * sw;
+    const swYaw = Math.sin(ph) * lerp(0.004, 0.002, b) * sw;
     cam.rotation.set(this.pitch + sh.rot.x + this.leanSm.x + J.rot.x + swPitch, this.yaw + Math.PI + sh.rot.y + this.leanSm.y + J.rot.y + swYaw, sh.rot.z + roll + this.leanSm.z + J.rot.z + swRoll, 'YXZ');
     cam.updateMatrixWorld();
     // deslocamento do tremor em espaço de câmera
