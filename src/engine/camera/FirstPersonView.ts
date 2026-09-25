@@ -283,15 +283,18 @@ export class FirstPersonView {
       // abaixo da mira — dá para ver o inimigo por cima do escudo
       const arc = Math.sin(clamp01(g) * Math.PI);
       // altura pela metade do escudo em tela: a borda de cima fica sempre no mesmo lugar
-      const half = 0.36 * 0.8 * aspectK;
-      const pos = this.v2.set(lerp(-0.4, -0.13, g), lerp(-0.13 - half, -0.04 - half, g) + arc * 0.03, lerp(-0.56, -0.54, g) - arc * 0.05).add(offset);
+      // escudo GRANDE (encolhe pouco em tela estreita) e mais baixo: parece do
+      // tamanho real sem tapar a mira
+      const shScale = 1.05 * lerp(1, aspectK, 0.4);
+      const half = 0.36 * shScale;
+      const pos = this.v2.set(lerp(-0.42, -0.15, g), lerp(-0.2 - half, -0.07 - half, g) + arc * 0.03, lerp(-0.56, -0.54, g) - arc * 0.05).add(offset);
       pos.y += Math.sin(p.time * 2.1) * 0.004 * clamp01(g);
       pos.z += this.shieldKick.value * 0.06;
       pos.y -= lower * 0.5 + tk * 0.22 - this.shieldKick.value * 0.015;
       pos.x -= tk * 0.08;
       pos.x *= aspectK;
       sh.root.position.copy(pos);
-      sh.root.scale.setScalar(0.8 * aspectK);
+      sh.root.scale.setScalar(shScale);
       sh.root.quaternion.setFromEuler(new THREE.Euler(
         lerp(0.2, -0.1, g) - this.shieldKick.value * 0.14,
         Math.PI + lerp(-0.5, -0.1, g),
