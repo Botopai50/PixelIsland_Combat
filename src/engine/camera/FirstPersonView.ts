@@ -267,7 +267,7 @@ export class FirstPersonView {
 
     // ------------------------------------------------ rastro (espaço da câmera)
     const a = p.attack;
-    if (model && a && p.state === 'attack' && main !== 'bow' && (p.swingPhase === 'active' || (p.swingPhase === 'recovery' && p.stateT - a.timing.windup - a.timing.active < 0.04))) {
+    if (model && a && p.state === 'attack' && main !== 'bow' && (p.swingPhase === 'active' || (p.swingPhase === 'recovery' && p.stateT - a.timing.windup - a.timing.active < Math.max(0.04, (viewmodelStyle(a.def.id).follow ?? 0) * a.timing.recovery * 0.8)))) {
       const base = this.v.set(0, a.weapon.bladeStart * T.rangeMul, 0).applyQuaternion(model.root.quaternion).add(model.root.position);
       const tip = this.v2.set(0, a.weapon.bladeEnd * T.rangeMul, 0).applyQuaternion(model.root.quaternion).add(model.root.position);
       this.trail.color.set(a.charged ? 0x9fe8ff : a.weapon.trailColor);

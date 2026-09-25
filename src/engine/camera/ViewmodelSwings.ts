@@ -22,7 +22,9 @@ interface Style {
   /** Câmera acompanha o golpe: pose na preparação (W) e no fim (F). */
   camW: Lean;
   camF: Lean;
-  /** Segura a pose final por esta fração da recuperação. */
+  /** Fração da recuperação usada para terminar o arco (continuação visível). */
+  follow?: number;
+  /** Segura a pose final até esta fração da recuperação. */
   hold: number;
   twoHanded?: boolean;
 }
@@ -36,7 +38,7 @@ const S: Record<string, Style> = {
     M: { p: [0.02, -0.1, -0.64], d: [-0.86, 0.06, -0.5] },
     F: { p: [-0.46, -0.14, -0.4], d: [-0.92, 0.0, 0.25] },
     camW: [0.01, -0.1, -0.03], camF: [-0.01, 0.13, 0.04],
-    hold: 0.2,
+    follow: 0.4, hold: 0.55,
   },
   // subindo da esquerda para a direita
   slashLR: {
@@ -44,7 +46,7 @@ const S: Record<string, Style> = {
     M: { p: [0.02, -0.06, -0.64], d: [0.82, 0.3, -0.5] },
     F: { p: [0.44, 0.12, -0.4], d: [0.45, 0.85, -0.1] },
     camW: [-0.04, 0.08, 0.07], camF: [0.05, -0.1, -0.1],
-    hold: 0.2,
+    follow: 0.4, hold: 0.55,
   },
   // de cima para baixo: lâmina atrás da cabeça → racha o centro → crava embaixo
   overhead: {
@@ -52,7 +54,7 @@ const S: Record<string, Style> = {
     M: { p: [0.08, 0.02, -0.62], d: [0.05, 0.6, -0.8] },
     F: { p: [0.05, -0.34, -0.48], d: [0, -0.6, -0.8] },
     camW: [0.1, -0.02, -0.03], camF: [-0.16, 0, 0.02],
-    hold: 0.3,
+    follow: 0.35, hold: 0.55,
   },
   // giratório: arco de quase meia volta
   spin: {
@@ -60,7 +62,7 @@ const S: Record<string, Style> = {
     M: { p: [0, -0.18, -0.68], d: [-0.86, 0.05, -0.5] },
     F: { p: [-0.48, -0.18, -0.36], d: [-0.85, 0, 0.35] },
     camW: [0, -0.14, -0.06], camF: [0, 0.22, 0.08],
-    hold: 0.1,
+    follow: 0.2, hold: 0.3,
   },
   // machado: golpe LATERAL — lâmina deitada atrás à direita, varre na horizontal e PARA cravada no alvo
   chop: {
@@ -125,15 +127,24 @@ const easeOutBack = (t: number, s = 1.9) => 1 + (s + 1) * Math.pow(t - 1, 3) + s
  */
 function track(style: Style, phase: string, u: number): { seg: 0 | 1 | 2 | 3; k: number } {
   if (phase === 'charge') return { seg: 0, k: 1 };
-  if (phase === 'windup') return { seg: 0, k: easeOutBack(clamp01(u), 1.4) };
-  if (phase === 'active') {
-    const t = clamp01(u);
-    // metade do tempo para chegar ao centro acelerando; o resto passa e "estica"
-    if (t < 0.45) return { seg: 1, k: easeInQuad(t / 0.45) };
-    return { seg: 2, k: easeOutBack((t - 0.45) / 0.55, 1.2) };
+  const t = clamp01(u);
+  const fol = style.follow ?? 0;
+  if (phase === 'windup') {
+    // chega ao W em 65% da preparação e já começa a andar devagar para o
+    // centro: o olho acompanha o arco desde o início, sem teleporte
+    if (t < 0.65) return { seg: 0, k: easeOutBack(t / 0.65, 1.3) };
+    return { seg: 1, k: 0.22 * easeInQuad((t - 0.65) / 0.35) };
   }
-  const t = clamp01((u - style.hold) / (1 - style.hold));
-  return { seg: 3, k: easeInOutSine(t) };
+  if (phase === 'active') {
+    // cruza o centro no meio da janela de dano (momento do acerto intacto)
+    if (t < 0.5) return { seg: 1, k: 0.22 + 0.78 * easeInOutSine(t / 0.5) };
+    const k = (t - 0.5) / 0.5;
+    return { seg: 2, k: fol > 0 ? 0.4 * k : easeOutBack(k, 1.2) };
+  }
+  // continuação desacelerando dentro da recuperação: é aqui que o golpe "lê"
+  if (fol > 0 && t < fol) return { seg: 2, k: 0.4 + 0.6 * easeOutBack(t / fol, 1.1) };
+  const r = clamp01((t - style.hold) / (1 - style.hold));
+  return { seg: 3, k: easeInOutSine(r) };
 }
 
 /**
