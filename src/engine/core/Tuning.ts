@@ -107,14 +107,14 @@ export function defaultTuning(): Tuning {
     perfectDodgeWindow: 0.2,
     flurryEnabled: true,
 
-    staminaMax: 100,
+    staminaMax: 85,
     staminaRegen: 32,
     sprintCost: 10,
     dodgeCost: 12,
     chargeCost: 25,
 
     damageMul: 1,
-    rangeMul: 1,
+    rangeMul: 1.15,
     attackSpeedMul: 1,
     recoveryMul: 1,
     attackBuffer: 0.28,
@@ -182,7 +182,10 @@ export function rawPreset(t: Tuning): Partial<Tuning> {
   };
 }
 
-const KEY = 'pixelisland-combat.tuning.v3';
+const KEY = 'pixelisland-combat.tuning.v4';
+/** Versão anterior: aproveitada, exceto os valores cujo padrão mudou. */
+const OLD_KEY = 'pixelisland-combat.tuning.v3';
+const CHANGED_IN_V4: (keyof Tuning)[] = ['staminaMax', 'rangeMul'];
 
 export function saveTuning(t: Tuning) {
   try {
@@ -197,6 +200,14 @@ export function loadTuning(): Tuning {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) Object.assign(base, JSON.parse(raw));
+    else {
+      const old = localStorage.getItem(OLD_KEY);
+      if (old) {
+        const o = JSON.parse(old) as Partial<Tuning>;
+        for (const k of CHANGED_IN_V4) delete o[k];
+        Object.assign(base, o);
+      }
+    }
   } catch {
     /* ignora */
   }
