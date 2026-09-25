@@ -116,6 +116,8 @@ export class PlayerController implements Damageable {
   // ---- escalada (estilo BotW)
   /** Normal da parede sendo escalada (aponta para fora). */
   readonly climbN = new THREE.Vector3();
+  /** Ponto na superfície da parede (x,z) com y = topo do bloco (para as mãos). */
+  readonly climbWall = new THREE.Vector3();
   /** Fase do ciclo de escalada (braços/pernas alternando). */
   climbPhase = 0;
   /** 0..1: quanto está se movendo na parede. */
@@ -463,6 +465,7 @@ export class PlayerController implements Damageable {
     this.sneaking = false;
     this.climbN.set(nx, 0, nz).normalize();
     this.climbTop = top;
+    this.climbWall.set(x, top, z);
     this.climbJumpT = 0;
     const r = this.motor.radius * 0.85;
     this.position.x = x + nx * r;
@@ -489,6 +492,7 @@ export class PlayerController implements Damageable {
     // subir tem esforço: quanto mais alto, mais demora (pendura → puxa → joelho → de pé)
     this.mantleDur = clamp(0.42 + h * 0.3, 0.5, 1.05);
     this.climbN.set(nx, 0, nz).normalize();
+    this.climbWall.set(x, top, z);
     this.motor.velocity.set(0, 0, 0);
     this.faceWall(nx, nz);
     this.setState('mantle');
@@ -589,6 +593,7 @@ export class PlayerController implements Damageable {
     p.x = hit.x + hit.nx * r;
     p.z = hit.z + hit.nz * r;
     this.climbTop = hit.top;
+    this.climbWall.set(hit.x, hit.top, hit.z);
     this.faceWall(n.x, n.z);
     // a fase avança com a intenção de mover (não com a velocidade instantânea)
     this.climbPhase += (Math.abs(my) * 1.5 + Math.abs(mx) * 1.35) * (1 - 0.35 * tired) * dt / 0.95;

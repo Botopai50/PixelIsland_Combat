@@ -145,6 +145,7 @@ export class PlayerView {
     // só parado/quase parado: andando/correndo quem manda é a passada animada
     const spd = Math.hypot(p.motor.velocity.x, p.motor.velocity.z);
     this.footIK.update(dt, rig, feetOnGround && spd < 0.6, 1, !p.motor.grounded);
+    this.climbHands(p);
     rig.root.updateMatrixWorld(true);
 
 
@@ -328,5 +329,54 @@ export class PlayerView {
       this.trail.push(base, tip);
     }
     this.trail.update(dt, T.trailsEnabled && !this.hidden, a ? 0.6 + a.def.strength * 0.6 : 1);
+  }
+
+  // ---------------------------------------------------------------- mãos na parede / na borda
+  private climbT = new THREE.Vector3();
+  private climbP = new THREE.Vector3();
+  /**
+   * Escalando: cada mão encosta de verdade na parede (a pose animada é
+   * projetada no plano da parede; acima do topo, a mão agarra a borda).
+   * Subindo a beirada: as mãos ficam PLANTADAS na borda enquanto o corpo sobe.
+   */
+  private climbHands(p: PlayerController) {
+    if (p.state !== 'climb' && p.state !== 'mantle') return;
+    const rig = this.rig;
+    const n = p.climbN, w = p.climbWall;
+    const fy = Math.atan2(-n.x, -n.z);
+    const rx = -Math.cos(fy), rz = Math.sin(fy);
+    const mantle = p.state === 'mantle';
+    const u = mantle ? p.anim.actionU : 0;
+    // mantle: segura a borda até começar a levantar
+    const weight = mantle ? 1 - Math.min(1, Math.max(0, (u - 0.78) / 0.14)) : 1;
+    if (weight <= 0.001) return;
+    for (const side of [1, -1] as const) {
+      const upper = side === 1 ? rig.joints.upperArmR : rig.joints.upperArmL;
+      const fore = side === 1 ? rig.joints.forearmR : rig.joints.forearmL;
+      const hand = side === 1 ? rig.joints.handR : rig.joints.handL;
+      const t = this.climbT;
+      if (mantle) {
+        // na borda: afastadas na largura dos ombros, um pouco para dentro do topo
+        t.set(w.x + rx * 0.22 * side - n.x * 0.08, w.y + 0.03, w.z + rz * 0.22 * side - n.z * 0.08);
+      } else {
+        hand.getWorldPosition(t);
+        // projeta no plano da parede (encosta a palma)
+        const d = (t.x - w.x) * n.x + (t.z - w.z) * n.z;
+        t.x -= n.x * (d - 0.05);
+        t.z -= n.z * (d - 0.05);
+        // passou do topo: agarra a borda (em cima, um pouco para dentro)
+        if (t.y > w.y - 0.02) {
+          t.y = w.y + 0.03;
+          t.x -= n.x * 0.1;
+          t.z -= n.z * 0.1;
+        }
+      }
+      // cotovelos para fora e para trás (longe da parede)
+      upper.getWorldPosition(this.climbP);
+      this.climbP.x += n.x * 0.45 + rx * 0.35 * side;
+      this.climbP.z += n.z * 0.45 + rz * 0.35 * side;
+      this.climbP.y -= 0.25;
+      solveTwoBoneIK(upper, fore, ARM_UPPER, ARM_FORE, t, this.climbP, weight);
+    }
   }
 }
