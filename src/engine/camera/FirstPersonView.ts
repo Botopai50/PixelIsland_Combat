@@ -297,8 +297,8 @@ export class FirstPersonView {
       sh.root.scale.setScalar(shScale);
       sh.root.quaternion.setFromEuler(new THREE.Euler(
         lerp(-0.3, -0.1, g) - this.shieldKick.value * 0.14,
-        Math.PI + lerp(-0.5, -0.1, g),
-        lerp(0.16, 0.03, g) + this.shieldKick.value * 0.03,
+        Math.PI + lerp(0.4, 0.05, g),
+        lerp(-0.2, -0.03, g) + this.shieldKick.value * 0.03,
       ));
       sh.setGlow(p.state === 'guardHit' ? 0.3 : 0);
       if (!this.armL.visible) {
