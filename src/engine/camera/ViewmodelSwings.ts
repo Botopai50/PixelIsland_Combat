@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { weaponBasis } from '../character/PlayerView';
-import { clamp01, easeOutCubic, easeInOutSine } from '../core/math';
+import { clamp01, easeInOutSine } from '../core/math';
 
 /**
  * Golpes da 1ª pessoa desenhados para LEITURA na câmera (espaço da câmera:
@@ -13,60 +13,71 @@ import { clamp01, easeOutCubic, easeInOutSine } from '../core/math';
  */
 type V3 = [number, number, number];
 type Key = { p: V3; d: V3; e?: V3 };
+/** Inclinação da câmera: [pitch, yaw, roll] em radianos. */
+type Lean = [number, number, number];
 interface Style {
   W: Key;
   M: Key;
   F: Key;
-  /** Segura a pose final por esta fração da recuperação (clareza). */
+  /** Câmera acompanha o golpe: pose na preparação (W) e no fim (F). */
+  camW: Lean;
+  camF: Lean;
+  /** Segura a pose final por esta fração da recuperação. */
   hold: number;
   twoHanded?: boolean;
 }
 
-// Poses verificadas por projeção na câmera (FOV 70, 16:9): mão e lâmina ficam
-// dentro do quadro em W, M e F — nada de preparação "fora da tela".
+// Golpes EXAGERADOS: a preparação e a continuação podem sair do quadro por
+// alguns frames — o que importa é o arco grande passando pelo centro.
 const S: Record<string, Style> = {
-  // da direita para a esquerda: ergue à direita → cruza deitada → termina embaixo à esquerda
+  // da direita para a esquerda: lâmina por cima do ombro direito → varre → sai embaixo à esquerda
   slashRL: {
-    W: { p: [0.36, -0.1, -0.5], d: [0.25, 0.75, -0.6] },
-    M: { p: [0.06, -0.16, -0.52], d: [-0.72, 0.12, -0.68] },
-    F: { p: [-0.24, -0.18, -0.5], d: [-0.72, -0.1, -0.68] },
-    hold: 0.3,
+    W: { p: [0.42, 0.04, -0.4], d: [0.5, 0.75, -0.1] },
+    M: { p: [0.02, -0.1, -0.64], d: [-0.86, 0.08, -0.5] },
+    F: { p: [-0.46, -0.26, -0.4], d: [-0.7, -0.4, -0.3] },
+    camW: [0.03, -0.07, -0.07], camF: [-0.04, 0.1, 0.1],
+    hold: 0.2,
   },
   // subindo da esquerda para a direita
   slashLR: {
-    W: { p: [-0.22, -0.18, -0.5], d: [-0.75, -0.3, -0.58] },
-    M: { p: [0.02, -0.12, -0.52], d: [0.72, 0.28, -0.64] },
-    F: { p: [0.3, 0.0, -0.5], d: [0.45, 0.65, -0.6] },
+    W: { p: [-0.4, -0.24, -0.4], d: [-0.75, -0.45, -0.2] },
+    M: { p: [0.02, -0.06, -0.64], d: [0.82, 0.3, -0.5] },
+    F: { p: [0.44, 0.12, -0.4], d: [0.45, 0.85, -0.1] },
+    camW: [-0.04, 0.08, 0.07], camF: [0.05, -0.1, -0.1],
+    hold: 0.2,
+  },
+  // de cima para baixo: lâmina atrás da cabeça → racha o centro → crava embaixo
+  overhead: {
+    W: { p: [0.2, 0.17, -0.38], d: [0.1, 0.75, 0.55] },
+    M: { p: [0.08, 0.02, -0.62], d: [0.05, 0.6, -0.8] },
+    F: { p: [0.05, -0.34, -0.48], d: [0, -0.6, -0.8] },
+    camW: [0.1, -0.02, -0.03], camF: [-0.16, 0, 0.02],
     hold: 0.3,
   },
-  // de cima para baixo
-  overhead: {
-    W: { p: [0.18, 0.12, -0.45], d: [0.15, 0.85, -0.5] },
-    M: { p: [0.1, -0.06, -0.52], d: [0.2, 0.35, -0.92] },
-    F: { p: [0.06, -0.2, -0.52], d: [0.05, -0.12, -0.99] },
-    hold: 0.35,
-  },
-  // giratório: arco amplo da direita para a esquerda
+  // giratório: arco de quase meia volta
   spin: {
-    W: { p: [0.4, -0.18, -0.45], d: [0.6, 0.2, -0.77] },
-    M: { p: [0.0, -0.2, -0.55], d: [-0.78, 0.05, -0.62] },
-    F: { p: [-0.3, -0.18, -0.48], d: [-0.75, 0.05, -0.66] },
-    hold: 0.15,
+    W: { p: [0.46, -0.12, -0.34], d: [0.9, 0.1, 0.25] },
+    M: { p: [0, -0.18, -0.68], d: [-0.86, 0.05, -0.5] },
+    F: { p: [-0.48, -0.18, -0.36], d: [-0.85, 0, 0.35] },
+    camW: [0, -0.14, -0.06], camF: [0, 0.22, 0.08],
+    hold: 0.1,
   },
-  // machado: ergue à direita, corta de lado e PARA no alvo
+  // machado: ergue bem atrás à direita, corta de lado e PARA cravado no alvo
   chop: {
-    W: { p: [0.34, -0.2, -0.42], d: [0.45, 0.72, -0.53] },
-    M: { p: [0.1, -0.22, -0.48], d: [-0.55, 0.22, -0.8] },
-    F: { p: [-0.06, -0.25, -0.54], d: [-0.75, 0.12, -0.65] },
-    hold: 0.45,
+    W: { p: [0.4, 0.06, -0.38], d: [0.55, 0.78, 0.0] },
+    M: { p: [0.12, -0.18, -0.56], d: [-0.55, 0.22, -0.8] },
+    F: { p: [-0.08, -0.26, -0.58], d: [-0.8, 0.1, -0.6] },
+    camW: [0.05, -0.08, -0.06], camF: [-0.06, 0.06, 0.05],
+    hold: 0.4,
     twoHanded: true,
   },
-  // picareta: ergue acima e desce até o chão à frente
+  // picareta: acima e atrás da cabeça → desce com tudo até o chão à frente
   mine: {
-    W: { p: [0.12, 0.05, -0.42], d: [0.1, 0.8, -0.6] },
-    M: { p: [0.08, -0.08, -0.5], d: [0, 0.35, -0.94] },
-    F: { p: [0.05, -0.2, -0.54], d: [0, -0.12, -0.99] },
-    hold: 0.45,
+    W: { p: [0.14, 0.17, -0.38], d: [0.05, 0.75, 0.55] },
+    M: { p: [0.08, -0.02, -0.58], d: [0, 0.5, -0.86] },
+    F: { p: [0.05, -0.28, -0.55], d: [0, -0.4, -0.92] },
+    camW: [0.12, 0, 0], camF: [-0.14, 0, 0],
+    hold: 0.4,
     twoHanded: true,
   },
 };
@@ -93,7 +104,7 @@ export function viewmodelStyle(attackId: string): Style {
   return S[BY_ATTACK[attackId] ?? 'slashRL'];
 }
 
-const qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
+const qb = new THREE.Quaternion();
 const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3();
 
 function keyQuat(k: Key, out: THREE.Quaternion) {
@@ -102,6 +113,27 @@ function keyQuat(k: Key, out: THREE.Quaternion) {
 function blend(a: { p: THREE.Vector3; q: THREE.Quaternion }, bp: THREE.Vector3, bq: THREE.Quaternion, t: number) {
   a.p.lerp(bp, t);
   a.q.slerp(bq, t);
+}
+
+/** Aceleração forte (smear) e passagem além do ponto com retorno. */
+const easeInQuad = (t: number) => t * t;
+const easeOutBack = (t: number, s = 1.9) => 1 + (s + 1) * Math.pow(t - 1, 3) + s * Math.pow(t - 1, 2);
+
+/**
+ * Onde o golpe está: 0 = descanso, 1 = W, 2 = M, 3 = F (com overshoot).
+ * Mesmo mapa para a arma e para a câmera.
+ */
+function track(style: Style, phase: string, u: number): { seg: 0 | 1 | 2 | 3; k: number } {
+  if (phase === 'charge') return { seg: 0, k: 1 };
+  if (phase === 'windup') return { seg: 0, k: easeOutBack(clamp01(u), 1.4) };
+  if (phase === 'active') {
+    const t = clamp01(u);
+    // metade do tempo para chegar ao centro acelerando; o resto passa e "estica"
+    if (t < 0.45) return { seg: 1, k: easeInQuad(t / 0.45) };
+    return { seg: 2, k: easeOutBack((t - 0.45) / 0.55, 1.2) };
+  }
+  const t = clamp01((u - style.hold) / (1 - style.hold));
+  return { seg: 3, k: easeInOutSine(t) };
 }
 
 /**
@@ -115,34 +147,18 @@ export function viewmodelSwingPose(
   outP: THREE.Vector3, outQ: THREE.Quaternion,
 ) {
   const cur = { p: outP, q: outQ };
-  const W = style.W, M = style.M, F = style.F;
-  if (phase === 'windup' || phase === 'charge') {
-    // antecipação: sai do descanso e recua para o canto (desacelera no fim = "carrega")
-    const t = phase === 'charge' ? 1 : easeOutCubic(u);
-    outP.copy(restP);
-    outQ.copy(restQ);
-    blend(cur, vc.set(...W.p), keyQuat(W, qa), t);
-    return;
-  }
-  if (phase === 'active') {
-    // golpe rápido: W → M → F (arco em dois trechos)
-    const t = clamp01(u);
-    if (t < 0.5) {
-      const k = easeInOutSine(t / 0.5);
-      outP.set(...W.p);
-      keyQuat(W, outQ);
-      blend(cur, vc.set(...M.p), keyQuat(M, qb), k);
-    } else {
-      const k = easeOutCubic((t - 0.5) / 0.5);
-      outP.set(...M.p);
-      keyQuat(M, outQ);
-      blend(cur, vc.set(...F.p), keyQuat(F, qb), k);
-    }
-    return;
-  }
-  // recuperação: segura a pose final (leitura) e volta suave ao descanso
-  outP.set(...F.p);
-  keyQuat(F, outQ);
-  const t = clamp01((u - style.hold) / (1 - style.hold));
-  if (t > 0) blend(cur, restP, restQ, easeInOutSine(t));
+  const { seg, k } = track(style, phase, u);
+  const [A, B] = seg === 0 ? [null, style.W] : seg === 1 ? [style.W, style.M] : seg === 2 ? [style.M, style.F] : [style.F, null];
+  if (A) { outP.set(...A.p); keyQuat(A, outQ); } else { outP.copy(restP); outQ.copy(restQ); }
+  if (B) blend(cur, vc.set(...B.p), keyQuat(B, qb), k);
+  else if (k > 0) blend(cur, restP, restQ, k);
+}
+
+/** Inclinação da câmera acompanhando o golpe (1ª pessoa). */
+export function viewmodelCamLean(style: Style, phase: string, u: number, out: THREE.Vector3) {
+  const { seg, k } = track(style, phase, u);
+  const W = style.camW, F = style.camF;
+  const mid: Lean = [(W[0] + F[0]) * 0.3, (W[1] + F[1]) * 0.3, (W[2] + F[2]) * 0.3];
+  const [a, b]: [Lean, Lean] = seg === 0 ? [[0, 0, 0], W] : seg === 1 ? [W, mid] : seg === 2 ? [mid, F] : [F, [0, 0, 0]];
+  return out.set(a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k);
 }

@@ -3,6 +3,8 @@ import type { GameContext } from '../core/Context';
 import type { AimSource, PlayerController } from '../character/PlayerController';
 import { clamp, clamp01, damp, dampAngle, dirToYaw, lerp, easeInOutSine, Spring } from '../core/math';
 import { EYE } from './FirstPersonView';
+import { viewmodelCamLean, viewmodelStyle } from './ViewmodelSwings';
+import { ATTACKS } from '../combat/Attacks';
 
 /**
  * Câmera de 1ª e 3ª pessoa com transição suave (mesma mira, mesmo yaw/pitch),
@@ -26,6 +28,8 @@ export class CameraRig implements AimSource {
   private landDip = new Spring(170, 13);
   private pivot = new THREE.Vector3();
   private tmp = new THREE.Vector3();
+  private swingLean = new THREE.Vector3();
+  private leanSm = new THREE.Vector3();
   private tmp2 = new THREE.Vector3();
   private dir = new THREE.Vector3();
   private raycaster = new THREE.Raycaster();
@@ -175,7 +179,15 @@ export class CameraRig implements AimSource {
     const sh = this.ctx.shake;
     const roll = b > 0.5 && p.state === 'dodge' && (p.dodgeType === 'hopL' || p.dodgeType === 'hopR')
       ? Math.sin(clamp01(p.stateT / 0.3) * Math.PI) * 0.08 * (p.dodgeType === 'hopL' ? 1 : -1) : 0;
-    cam.rotation.set(this.pitch + sh.rot.x, this.yaw + Math.PI + sh.rot.y, sh.rot.z + roll, 'YXZ');
+    // 1ª pessoa: a cabeça acompanha o golpe (inclina/gira junto com a arma)
+    const lean = this.swingLean.set(0, 0, 0);
+    if (b > 0.5 && T.fpSwingLean > 0) {
+      const d = p.state === 'attack' && p.attack ? p.attack.def : p.state === 'charge' && p.weapon?.charged ? ATTACKS[p.weapon.charged] : null;
+      if (d && p.mainHand !== 'bow') viewmodelCamLean(viewmodelStyle(d.id), p.state === 'charge' ? 'charge' : p.swingPhase, p.swingU, lean);
+      lean.multiplyScalar(T.fpSwingLean * b);
+    }
+    this.leanSm.lerp(lean, 1 - Math.exp(-realDt * 30));
+    cam.rotation.set(this.pitch + sh.rot.x + this.leanSm.x, this.yaw + Math.PI + sh.rot.y + this.leanSm.y, sh.rot.z + roll + this.leanSm.z, 'YXZ');
     cam.updateMatrixWorld();
     // deslocamento do tremor em espaço de câmera
     this.tmp.set(sh.offset.x, sh.offset.y, 0).applyQuaternion(cam.quaternion);
