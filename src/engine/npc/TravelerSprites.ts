@@ -1,3 +1,4 @@
+import { registerAnimalSpritePack } from '../enemies/AnimalSpriteCache';
 import { build27Pack, sdCapsule, sdEllipsoid, type CreatureViewPack } from '../enemies/Animals';
 
 type Vec3 = [number, number, number];
@@ -280,4 +281,10 @@ export function buildTravelerPosePack(pose: TravelerPose) {
   }, true);
   rawPacks.set(pose, pack);
   return pack;
+}
+
+export function getTravelerPosePack(pose: TravelerPose) {
+  return registerAnimalSpritePack(buildTravelerPosePack(pose), {
+    module: '../npc/TravelerSprites.ts', factory: 'getTravelerPosePack', args: [pose], asymmetric: true,
+  }, buildTravelerPosePack);
 }

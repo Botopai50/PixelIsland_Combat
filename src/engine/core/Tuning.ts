@@ -59,8 +59,6 @@ export interface Tuning {
   weaponRecoil: boolean;
   knockbackMul: number;
   screenFx: boolean;
-  // Visual do personagem
-  fullBodyHero: boolean;
   // Câmera
   fov: number;
   sensitivity: number;
@@ -165,7 +163,6 @@ export function defaultTuning(): Tuning {
     showHitboxes: false,
     freezeBillboards: false,
     peacefulAnimals: false,
-    fullBodyHero: false,
   };
 }
 

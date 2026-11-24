@@ -31,8 +31,6 @@ export class TweakPanel {
       'Salvar no navegador': () => saveTuning(this.t),
       'Copiar JSON': () => navigator.clipboard?.writeText(JSON.stringify(this.t, null, 2)),
     };
-    gui.addFolder('Personagem').add(t, 'fullBodyHero').name('Sprite de corpo inteiro');
-
     const fp = gui.addFolder('Presets e comparação');
     for (const [k, fn] of Object.entries(presets)) fp.add({ [k]: fn }, k);
     for (const [k, fn] of Object.entries(actions)) fp.add({ [k]: fn }, k);

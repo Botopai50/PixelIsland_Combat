@@ -2,7 +2,7 @@ import { animalTurnProfile, type AnimalTurnPose } from './AnimalTurnPose';
 import type { SpriteRecipe, SpriteView } from './AnimalSpriteCache';
 
 // Apenas módulos locais conhecidos; o worker executa o mesmo gerador de pixels do jogo.
-const modules = import.meta.glob(['./*.ts', '!./AnimalSprite*.ts']);
+const modules = import.meta.glob(['./*.ts', '../npc/TravelerSprites.ts', '!./AnimalSprite*.ts']);
 type Texture = { image: { data: Uint8Array; width: number; height: number } };
 type Pack = {
   getView(tier: number, direction: number): Texture;

@@ -4,7 +4,7 @@ import type { GameContext } from '../core/Context';
 import { dampAngle } from '../core/math';
 import { BasePixelAnimal } from '../enemies/Animals';
 import {
-  buildTravelerPosePack, TRAVELER_CENTER, TRAVELER_IDLE, TRAVELER_IDLE_FPS,
+  getTravelerPosePack, TRAVELER_CENTER, TRAVELER_IDLE, TRAVELER_IDLE_FPS,
   TRAVELER_PX, TRAVELER_SIZE, TRAVELER_TALK, TRAVELER_TALK_FPS,
 } from './TravelerSprites';
 
@@ -16,7 +16,7 @@ export class TravelerView extends BasePixelAnimal {
   private talkTime = 0;
 
   constructor(ctx: GameContext, position: THREE.Vector3, playerStart: THREE.Vector3) {
-    super(ctx, buildTravelerPosePack('idle0').getView(4, 0)!, TRAVELER_PX, TRAVELER_PX,
+    super(ctx, getTravelerPosePack('idle0').getView(4, 0)!, TRAVELER_PX, TRAVELER_PX,
       TRAVELER_SIZE, TRAVELER_SIZE, 'Bento');
     this.position = position;
     this.facing = Math.atan2(playerStart.x - position.x, playerStart.z - position.z);
@@ -44,7 +44,7 @@ export class TravelerView extends BasePixelAnimal {
     const idleFrame = Math.floor(this.idleTime * TRAVELER_IDLE_FPS) % TRAVELER_IDLE.length;
     const talkFrame = Math.max(0, TRAVELER_TALK.length - Math.ceil(this.talkTime * TRAVELER_TALK_FPS));
     const pose = this.talkTime > 0 ? TRAVELER_TALK[talkFrame] : TRAVELER_IDLE[idleFrame];
-    this.renderBillboard(buildTravelerPosePack(pose), this.position.y + TRAVELER_CENTER, camera, buffer);
+    this.renderBillboard(getTravelerPosePack(pose), this.position.y + TRAVELER_CENTER, camera, buffer);
     this.talkTime = Math.max(0, this.talkTime - dt);
   }
 

@@ -54,7 +54,7 @@ const densityPending = new Set<string>();
 const densityCacheLimit = 96 * 1024 * 1024;
 // A textura precisa de pelo menos uma linha por célula na tela. Estes degraus
 // evitam uma nova textura a cada movimento da câmera.
-const densityLevels = [96, 160, 256, 384, Infinity];
+const densityLevels = [64, 96, 128, 160, 224, 320, 448, Infinity];
 let densityBytes = 0;
 
 function cacheDensityView(key: string, texture: THREE.CanvasTexture) {
@@ -90,9 +90,7 @@ export function getAnimalTurnTexture(
   const view = getResolvedAnimalView(pack);
   if (!recipe || !view || !pack.renderView || visibleRows < 12) return undefined;
   if (/^(bite|slam|stomp|attack|strike|swipe|roots|sweep|stones|charge|pounce|death|hurt|peck|snap)/i.test(String(recipe.args[0]))) return undefined;
-  const limit = visibleRows > 126 ? 128 : visibleRows > 58 ? 96 : 64;
-  const height = Math.min(resolution.height, limit);
-  const width = Math.max(1, Math.round(resolution.width * height / resolution.height));
+  const { width, height } = resolution;
   const turn = mirrored ? { look: -pose.look, step: -pose.step } : pose;
   const keyFor = (value: AnimalTurnPose) =>
     `${recipeKey(recipe)}:turn:${width}x${height}:${view.tier}:${view.direction}:${value.look}:${value.step}`;
@@ -124,18 +122,18 @@ export function getAnimalDensityTexture(
   const source = fallback.image;
   if (source.width === resolution.width && source.height === resolution.height) return fallback;
   // A versão leve tem detalhe suficiente se a projeção não ocupa suas linhas.
-  if (visibleRows < Math.min(source.height, resolution.height) * .75) return fallback;
+  if (source.height <= resolution.height && visibleRows < source.height * .85) return fallback;
   const recipe = packRecipes.get(pack);
   const view = pole ? { tier: pole > 0 ? 9 : 10, direction: 0 } : getResolvedAnimalView(pack);
   if (!submit || !pack.renderView || !recipe || !view) return fallback;
 
-  const needed = densityLevels.find(limit => limit >= visibleRows) ?? Infinity;
+  const needed = densityLevels.find(limit => limit >= visibleRows / .85) ?? Infinity;
   const bank = packBanks.get(pack);
   const frames = bank?.recipes.length ? bank.recipes : [recipe];
   const nativeLevel = densityLevels.find(level => level >= resolution.height) ?? Infinity;
   const preferredLevel = Math.min(needed, nativeLevel);
   let ready: THREE.CanvasTexture | undefined;
-  for (let i = densityLevels.indexOf(nativeLevel); i >= 0; i--) {
+  for (let i = densityLevels.indexOf(preferredLevel); i >= 0; i--) {
     const level = densityLevels[i];
     const height = Math.min(resolution.height, level);
     if (height < source.height && height !== resolution.height) break;

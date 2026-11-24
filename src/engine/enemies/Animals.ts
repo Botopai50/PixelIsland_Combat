@@ -7,7 +7,7 @@ import { steerAnimalLocomotion } from './AnimalLocomotion';
 import { keepAnimalAboveGround } from './AnimalGrounding';
 import { sampleAnimalCycle } from './AnimalAnimation';
 import * as THREE from 'three';
-import { ACTOR_PIXELS_PER_METER, actorScreenPixelSize, actorSpriteResolution } from '../character/ActorPixelGrid';
+import { actorScreenPixelSize, actorSpriteResolution } from '../character/ActorPixelGrid';
 import type { GameContext } from '../core/Context';
 import type { Damageable, HitInfo, HitResult, Hurtbox, Team } from '../combat/types';
 import { emptyResult, newId } from '../combat/types';
@@ -516,8 +516,6 @@ export interface CreatureViewPack {
   getSunView(dirIdx: number, sunPitchDeg: number, budgetAware?: boolean): THREE.CanvasTexture | null;
 }
 
-const FALLBACK_DENSITY_SCALE = ACTOR_PIXELS_PER_METER / ANIMAL_PPU;
-
 export function build27Pack(
   pw: number, ph: number, ex: number, ey: number,
   pal: Record<string, [number, number, number]>,
@@ -526,8 +524,8 @@ export function build27Pack(
   asymmetric = false,
 ): CreatureViewPack {
   // Vistas leves para a distância e para enquanto o worker prepara o sprite na escala do mundo.
-  const bw = Math.min(96, Math.max(8, Math.round(pw * FALLBACK_DENSITY_SCALE)));
-  const bh = Math.min(96, Math.max(8, Math.round(ph * FALLBACK_DENSITY_SCALE)));
+  const bw = Math.min(96, Math.max(8, pw));
+  const bh = Math.min(96, Math.max(8, ph));
   let topTex: THREE.CanvasTexture | null = null;
   let bottomTex: THREE.CanvasTexture | null = null;
   const cache = new Map<number, THREE.CanvasTexture>();
@@ -1584,7 +1582,7 @@ export abstract class BasePixelAnimal implements AnimalEntity {
       const pose = visible && !isPolar && this.alive && this.flash < .35
         ? quantizeTurnPose(turn.headYaw, turn.pivotPhase) : undefined;
       const normal = visible ? getAnimalDensityTexture(pack, tex, this.spriteResolution, rows, isPolar ? Math.sign(upDot) : 0) : tex;
-      const turning = pose && getAnimalTurnTexture(pack, this.spriteResolution, rows, pose, flipX);
+      const turning = pose && getAnimalTurnTexture(pack, normal.image, rows, pose, flipX);
       this.setTex(turning ?? normal);
     }
     this.mesh.scale.set(flipX ? -this.worldW : this.worldW, this.worldH, 1);

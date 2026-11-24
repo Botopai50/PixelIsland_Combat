@@ -6,7 +6,7 @@ import { previewAnimalTurn } from '../enemies/AnimalTurnPose';
 import { HERO_STYLE, HumanoidRig } from '../character/HumanoidRig';
 import { SkeletalBillboard, type HeroBodyPartKey } from '../character/SkeletalBillboard';
 import {
-  buildTravelerPosePack, TRAVELER_CENTER, TRAVELER_IDLE, TRAVELER_IDLE_FPS,
+  buildTravelerPosePack, getTravelerPosePack, TRAVELER_CENTER, TRAVELER_IDLE, TRAVELER_IDLE_FPS,
   TRAVELER_PX, TRAVELER_SIZE, TRAVELER_TALK, TRAVELER_TALK_FPS, type TravelerPose,
 } from '../npc/TravelerSprites';
 import {
@@ -848,7 +848,7 @@ const CREATURES: Record<Exclude<EntityKey, 'hero'>, CreatureConfig> = {
     key: 'traveler', label: 'Bento, o viajante',
     pw: TRAVELER_PX, ph: TRAVELER_PX, ppu: TRAVELER_PX / TRAVELER_SIZE,
     worldW: TRAVELER_SIZE, worldH: TRAVELER_SIZE, centerY: TRAVELER_CENTER, camDist: 3.65,
-    getPack: buildTravelerPosePack,
+    getPack: getTravelerPosePack, getSheetPack: buildTravelerPosePack,
     anims: [
       { id: 'c_idle', label: '▶ Parado', frames: [...TRAVELER_IDLE], fps: TRAVELER_IDLE_FPS, isCycle: true },
       { id: 'c_talk', label: '▶ Conversando', frames: [...TRAVELER_TALK], fps: TRAVELER_TALK_FPS, isCycle: true },
@@ -2260,10 +2260,16 @@ function buildHeroCatalog(bb: SkeletalBillboard): SpriteEntry[] {
   return list;
 }
 
+function creatureWorldResolution(cfg: CreatureConfig) {
+  const scale = getRealWorldScale(cfg.key, cfg.worldH);
+  return actorSpriteResolution(cfg.worldW * scale, cfg.worldH * scale);
+}
+
 function buildCreatureCatalog(cfg: CreatureConfig, poseKey: string): SpriteEntry[] {
   const pack = (cfg.getSheetPack ?? cfg.getPack)(poseKey);
   const list: SpriteEntry[] = [];
   const prefix = `${cfg.key.toUpperCase()}_${poseKey.toUpperCase()}`;
+  const native = creatureWorldResolution(cfg);
 
   const add = (code: string, angleLabel: string, pitchDeg: number, yawDeg: number, cond: string, tex: THREE.CanvasTexture, mirror?: string) => {
     list.push({
@@ -2271,7 +2277,7 @@ function buildCreatureCatalog(cfg: CreatureConfig, poseKey: string): SpriteEntry
       codeName: `${prefix}_${code}`,
       part: 'creature',
       partLabel: `${cfg.label} · ${poseKey}`,
-      jointLabel: `Alvo no jogo ${ACTOR_PIXELS_PER_METER} px/m`,
+      jointLabel: `${ACTOR_PIXELS_PER_METER} px/m · ${native.width}×${native.height} px na escala do jogo`,
       angleLabel,
       pitchLabel: `${pitchDeg >= 0 ? '+' : ''}${pitchDeg}°`,
       yawLabel: `${yawDeg}°`,
@@ -2954,7 +2960,8 @@ export class SpriteInspector {
     }
 
     this.infoThumbEl.src = entry.dataUrl;
-    this.infoNameEl.textContent = `${entry.codeName} (${entry.w}×${entry.h} px)`;
+    const thumbnail = entry.part === 'creature' ? 'prévia ' : '';
+    this.infoNameEl.textContent = `${entry.codeName} (${thumbnail}${entry.w}×${entry.h} px)`;
     this.infoPartEl.textContent = `${entry.partLabel} · ${entry.jointLabel}`;
     this.infoAngleEl.textContent = `Ângulo: ${entry.angleLabel}${entry.mirrorNote ? ` — ${entry.mirrorNote}` : ''}`;
     this.infoCondEl.textContent = `Regra: ${entry.condition}`;
@@ -3088,13 +3095,13 @@ export class SpriteInspector {
     const bufH = this.bufSize.y || 480;
     const p = actorScreenPixelSize(bufH);
     if (tex) {
-      const scale = getRealWorldScale(cfg.key, cfg.worldH);
-      const resolution = actorSpriteResolution(cfg.worldW * scale, cfg.worldH * scale);
+      const resolution = creatureWorldResolution(cfg);
       const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) * .5);
       const depth = Math.max(.5, this.tmp.subVectors(this.creatureMesh.position, this.camPos).dot(this.camFwd));
       const visibleRows = bufH * cfg.worldH / (2 * depth * tanHalfFov * p);
+      const normal = getAnimalDensityTexture(pack, tex, resolution, visibleRows, isPolar ? Math.sign(upDot) : 0);
       const turnTexture = turning?.pose && !isPolar
-        ? getAnimalTurnTexture(pack, resolution, visibleRows, turning.pose, flipX) : undefined;
+        ? getAnimalTurnTexture(pack, normal.image, visibleRows, turning.pose, flipX) : undefined;
       const sample = this.renderer.domElement.dataset;
       if (turning) {
         sample.turnAngle = String(Math.round(turnYaw * 180 / Math.PI));
@@ -3103,8 +3110,7 @@ export class SpriteInspector {
         delete sample.turnAngle;
         delete sample.turnPose;
       }
-      const displayed = turnTexture ?? (isTurning
-        ? tex : getAnimalDensityTexture(pack, tex, resolution, visibleRows, isPolar ? Math.sign(upDot) : 0));
+      const displayed = turnTexture ?? normal;
       this.creatureMesh.scale.set(flipX ? -cfg.worldW : cfg.worldW, cfg.worldH, 1);
       if (this.creatureMapU.value !== displayed) {
         this.renderer.domElement.dataset.spriteResolution = `${displayed.image.width}×${displayed.image.height}`;

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createCustomHeroOverrides } from './CustomHeroSprites';
+import { ACTOR_PIXELS_PER_METER } from './ActorPixelGrid';
 
 /**
  * High-Detail Realistic 3D SDF Sculpted & Raymarched Sprites for the Hero (`HERO_PPU = 56`).
@@ -27,7 +28,7 @@ import { createCustomHeroOverrides } from './CustomHeroSprites';
 
 /** Uniform texels per world meter across every hero billboard part (56 PPU). */
 // Escala original da arte do herói e dos equipamentos. A grade de tela é compartilhada.
-export const HERO_PPU = 56;
+export const HERO_PPU = ACTOR_PIXELS_PER_METER;
 
 export interface BillboardPartMeta {
   /** World-space width in meters (`pixelWidth / HERO_PPU`). */

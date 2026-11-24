@@ -914,7 +914,6 @@ export class Game {
     // render: mundo + viewmodel (profundidade limpa → armas não atravessam paredes)
     const t3 = performance.now();
     const r = this.renderer;
-    this.view.renderFullBody(r, cam, this.bufSize);
     r.autoClear = true;
     r.render(ctx.scene, cam);
     if (first) {

@@ -1,4 +1,4 @@
-export const ACTOR_PIXELS_PER_METER = 38;
+export const ACTOR_PIXELS_PER_METER = 56;
 
 export function actorScreenPixelSize(bufferHeight: number): number {
   if (bufferHeight >= 680) return 3;

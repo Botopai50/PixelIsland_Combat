@@ -1057,7 +1057,7 @@ export class Boar implements Damageable {
       const rows = BOAR_H * pixelsPerMeter / p;
       const pose = visible && !isPolar && this.alive ? quantizeTurnPose(turn.headYaw, turn.pivotPhase) : undefined;
       const normal = visible ? getAnimalDensityTexture(pack, tex, boarResolution, rows, isPolar ? Math.sign(upDot) : 0) : tex;
-      const turning = pose && getAnimalTurnTexture(pack, boarResolution, rows, pose, flipX);
+      const turning = pose && getAnimalTurnTexture(pack, normal.image, rows, pose, flipX);
       this.setSlotTex(this.bodySlot, turning ?? normal);
     }
     this.bodySlot.mesh.scale.set(flipX ? -BOAR_W : BOAR_W, BOAR_H, 1);

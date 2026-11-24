@@ -3,7 +3,6 @@ import type { GameContext } from '../core/Context';
 import { HumanoidRig, HERO_STYLE, ARM_UPPER, ARM_FORE } from './HumanoidRig';
 import { HumanoidAnimator } from './HumanoidAnimator';
 import { SkeletalBillboard } from './SkeletalBillboard';
-import { FullBodyHeroSprite } from './FullBodyHeroSprite';
 import { solveTwoBoneIK } from './IK';
 import { FootIK } from './FootIK';
 import type { PlayerController } from './PlayerController';
@@ -44,7 +43,6 @@ export class PlayerView {
   readonly animator: HumanoidAnimator;
   readonly trail = new SlashTrail(26);
   private footIK: FootIK;
-  private fullBody?: FullBodyHeroSprite;
   private models = new Map<ItemId, WeaponModel>();
   private shield: WeaponModel;
   private lastMain: ItemId | null = null;
@@ -451,16 +449,6 @@ export class PlayerView {
       main === 'bow' || this.sheathed || toolInHands,
       this.rig.joints.chest,
     );
-  }
-
-  renderFullBody(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, buffer: THREE.Vector2) {
-    const enabled = !this.hidden && this.ctx.tuning.fullBodyHero;
-    if (enabled && !this.fullBody) {
-      this.fullBody = new FullBodyHeroSprite(this.billboard, this.gearBillboards, this.rig);
-      this.ctx.scene.add(this.fullBody.mesh);
-    }
-    this.fullBody?.setEnabled(enabled, this.ctx.scene);
-    if (enabled) this.fullBody?.update(renderer, camera, buffer, this.rig.root.position);
   }
 
   // ---------------------------------------------------------------- mãos na parede / na borda

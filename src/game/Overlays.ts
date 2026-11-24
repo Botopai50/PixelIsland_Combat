@@ -17,7 +17,7 @@ export const CONTROLS_DESKTOP: [string, string][] = [
   ['E', 'Conversar com Bento quando estiver perto'],
   ['G', 'Gerar inimigo'],
   ['R', 'Restaurar arena'],
-  ['P', 'Ajustes · Personagem: sprite de corpo inteiro'],
+  ['P', 'Painel de ajustes'],
   ['B', 'Comparar: juice ligado/desligado'],
   ['H', 'Ajuda'],
 ];
