@@ -1,27 +1,33 @@
 import * as THREE from 'three';
 import { ANIMAL_SPRITE_POSES } from './AnimalSpritePoses';
 import { sampleAnimalCycle } from './AnimalAnimation';
+import { hasAnimalSpriteAtlas, readAnimalSpriteAtlas } from './AnimalSpriteAtlas';
+import { ANIMAL_ATLAS_TOP, ANIMAL_ATLAS_BOTTOM, animalAtlasDirectionCount } from './AnimalSpriteAtlasLayout';
 
 export interface SpriteRecipe { module: string; factory: string; args: unknown[]; asymmetric?: boolean }
 export interface SpriteView { tier: number; direction: number; sunPitch?: number }
 export interface SpritePixels { data: Uint8Array; width: number; height: number }
 interface SpritePack {
   getView(tier: number, direction: number, budgetAware?: boolean, allowNull?: boolean): THREE.CanvasTexture | null;
+  getTop?(): THREE.CanvasTexture;
+  getBottom?(): THREE.CanvasTexture;
   getSunView?(direction: number, pitch: number, budgetAware?: boolean): THREE.CanvasTexture | null;
 }
+const originalViews = new WeakMap<SpritePack, SpritePack>();
 type Submit = (recipe: SpriteRecipe, view: SpriteView, done: (pixels: SpritePixels | null) => void, urgent: boolean) => boolean;
 let submit: Submit | undefined;
+let spriteStreamingStarted = false;
 const registered = new WeakSet<object>();
 const sharedViews = new Map<string, Map<number, THREE.CanvasTexture>>();
 const pendingViews = new WeakMap<Map<number, THREE.CanvasTexture>, Set<number>>();
 const resolvedViews = new WeakMap<object, SpriteView>();
-const families = new Map<string, { view: SpriteView; ready: Promise<void>; recipes: SpriteRecipe[] }>();
 const animationBanks = new Map<string, { recipes: SpriteRecipe[]; readyViews: Set<number> }>();
 const packBanks = new WeakMap<object, { recipes: SpriteRecipe[]; readyViews: Set<number> }>();
 const packRecipes = new WeakMap<object, SpriteRecipe>();
 const factories = new Map<string, (args: unknown[]) => SpritePack>();
 const restCycles = new Map<string, readonly string[]>();
 const recipeKey = (recipe: SpriteRecipe) => JSON.stringify(recipe);
+const loadingTexture = textureFromPixels({ data: new Uint8Array(4), width: 1, height: 1 });
 function viewsFor(recipe: SpriteRecipe) {
   const key = recipeKey(recipe);
   let cache = sharedViews.get(key);
@@ -38,6 +44,29 @@ function markReadyViews(bank: { recipes: SpriteRecipe[]; readyViews: Set<number>
 }
 
 export function getResolvedAnimalView(pack: object) { return resolvedViews.get(pack); }
+
+export function startAnimalSpriteStreaming() { spriteStreamingStarted = true; }
+
+/** O mapa pede o ângulo exato para exportação, mesmo enquanto o jogo usa outro ângulo. */
+export async function readAnimalCatalogView(pack: SpritePack, tier: number, direction: number) {
+  const recipe = packRecipes.get(pack);
+  if (recipe && hasAnimalSpriteAtlas(recipe, tier)) {
+    const views = viewsFor(recipe);
+    const key = tier * 32 + direction;
+    const cached = views.get(key);
+    if (cached) return cached;
+    const pixels = await readAnimalSpriteAtlas(recipe, tier, direction);
+    if (pixels) {
+      const texture = views.get(key) ?? textureFromPixels(pixels);
+      views.set(key, texture);
+      return texture;
+    }
+  }
+  const source = originalViews.get(pack) ?? pack;
+  if (tier === ANIMAL_ATLAS_TOP) return source.getTop?.();
+  if (tier === ANIMAL_ATLAS_BOTTOM) return source.getBottom?.();
+  return source.getView(tier, direction);
+}
 
 export function isAnimalLocomotionPack(pack: object) {
   const pose = String(packRecipes.get(pack)?.args[0] ?? '');
@@ -67,7 +96,9 @@ export function animalRestPack<T extends SpritePack>(pack: T, elapsed: number): 
 /** Aquecer o próximo ângulo sem abandonar o ângulo que a instância está desenhando. */
 export function ensureAnimalSpriteView(pack: object, tier: number, direction: number, urgent = true) {
   const family = packBanks.get(pack);
-  if (!submit || !family) return true;
+  if (!family) return true;
+  const first = family.recipes[0];
+  if (!submit && (!first || !hasAnimalSpriteAtlas(first, tier))) return true;
   const key = tier * 32 + direction;
   if (family.readyViews.has(key)) return true;
   if (family.recipes.every(next => viewsFor(next).has(key))) {
@@ -79,65 +110,24 @@ export function ensureAnimalSpriteView(pack: object, tier: number, direction: nu
 }
 
 function requestView(recipe: SpriteRecipe, tier: number, direction: number, urgent: boolean) {
-  if (!submit || tier < 0 || tier > 8 || direction < 0 || direction > (recipe.asymmetric ? 15 : 8)) return;
+  if (tier < 0 || tier > ANIMAL_ATLAS_BOTTOM || direction < 0 || direction >= animalAtlasDirectionCount(tier, recipe.asymmetric)) return;
+  const stored = hasAnimalSpriteAtlas(recipe, tier);
+  if (!stored && !submit) return;
   const views = viewsFor(recipe), key = tier * 32 + direction;
   let pending = pendingViews.get(views);
   if (!pending) { pending = new Set(); pendingViews.set(views, pending); }
   if (views.has(key) || pending.has(key)) return;
   pending.add(key);
-  const accepted = submit(recipe, { tier, direction }, pixels => {
+  const publish = (pixels: SpritePixels | null) => {
     pending.delete(key);
     if (pixels && !views.has(key)) views.set(key, textureFromPixels(pixels));
-  }, urgent);
+  };
+  if (stored) {
+    void readAnimalSpriteAtlas(recipe, tier, direction).then(publish);
+    return;
+  }
+  const accepted = submit?.(recipe, { tier, direction }, publish, urgent);
   if (!accepted) pending.delete(key);
-}
-
-function prepareFamily(recipe: SpriteRecipe) {
-  const key = `${recipe.module}:${recipe.factory}:${JSON.stringify(recipe.args.slice(1))}`;
-  let family = families.get(key);
-  if (family) return family;
-  const recipes = (ANIMAL_SPRITE_POSES[`${recipe.module}:${recipe.factory}`] ?? [String(recipe.args[0])])
-    .map(pose => ({ ...recipe, args: [pose, ...recipe.args.slice(1)] }));
-  const state = { view: { tier: 4, direction: 0 }, ready: Promise.resolve(), recipes };
-  family = state;
-  families.set(key, state);
-  state.ready = (async () => {
-    // Deixa o primeiro frame escolher o ângulo real da câmera antes do aquecimento.
-    await new Promise(resolve => setTimeout(resolve, 150));
-    const view = { ...state.view };
-    const warmView = async (next: SpriteRecipe, view: SpriteView) => {
-      if (!submit) return;
-      const cache = viewsFor(next);
-      const viewKey = view.tier * 32 + view.direction;
-      if (cache.has(viewKey)) return;
-      await new Promise<void>(resolve => {
-        const attempt = () => {
-          if (!submit) { resolve(); return; }
-          const accepted = submit(next, view, pixels => {
-            if (pixels && !cache.has(viewKey)) cache.set(viewKey, textureFromPixels(pixels));
-            resolve();
-          }, false);
-          if (!accepted) setTimeout(attempt, 25);
-        };
-        attempt();
-      });
-    };
-    for (const next of recipes) await warmView(next, view);
-    // Animal parado: preparar os lados e as costas, sem esperar por poses de salto/ataque.
-    const resting = recipes.filter(next => /^(idle|rest|perch|stand|sit|breathe)\d+$/i.test(String(next.args[0])));
-    for (let direction = 0; direction <= (recipe.asymmetric ? 15 : 8); direction++) {
-      for (const next of resting) await warmView(next, { tier: view.tier, direction });
-    }
-    for (const [bankKey, bank] of animationBanks) {
-      if (bankKey.startsWith(`${key}:`)) markReadyViews(bank);
-    }
-  })();
-  return state;
-}
-
-/** Todas as fases dos animais presentes ficam prontas antes de habilitar Jogar. */
-export async function waitForAnimalSprites() {
-  await Promise.all([...families.values()].map(family => family.ready));
 }
 
 /** Sem workers (incluindo testes e o próprio worker), usa o renderizador original. */
@@ -157,19 +147,26 @@ export function registerAnimalSpritePack<T extends SpritePack, A extends unknown
   packRecipes.set(pack, recipe);
   const factoryKey = `${recipe.module}:${recipe.factory}`;
   if (build && !factories.has(factoryKey)) factories.set(factoryKey, args => build(...args as A));
-  if (!submit || registered.has(pack)) return pack;
+  if ((!submit && !hasAnimalSpriteAtlas(recipe, 4)) || registered.has(pack)) return pack;
   registered.add(pack);
-  const family = prepareFamily(recipe);
-  const cycle = String(recipe.args[0]).replace(/\d+$/, '');
-  const bankKey = `${recipe.module}:${recipe.factory}:${JSON.stringify(recipe.args.slice(1))}:${cycle}`;
+  const pose = String(recipe.args[0]);
+  const cycle = pose.replace(/\d+$/, '');
+  const bankKey = `${factoryKey}:${JSON.stringify(recipe.args.slice(1))}:${cycle}`;
   let bank = animationBanks.get(bankKey);
   if (!bank) {
-    bank = { recipes: family.recipes.filter(next => String(next.args[0]).replace(/\d+$/, '') === cycle), readyViews: new Set() };
+    const poses = ANIMAL_SPRITE_POSES[factoryKey] ?? [];
+    const frames = poses.includes(pose) ? poses.filter(next => next.replace(/\d+$/, '') === cycle) : [pose];
+    bank = { recipes: frames.map(next => ({ ...recipe, args: [next, ...recipe.args.slice(1)] })), readyViews: new Set() };
     markReadyViews(bank);
     animationBanks.set(bankKey, bank);
   }
   packBanks.set(pack, bank);
   const original = pack.getView.bind(pack);
+  originalViews.set(pack, {
+    getView: original,
+    getTop: pack.getTop?.bind(pack),
+    getBottom: pack.getBottom?.bind(pack),
+  });
   // Cada pose tem seu próprio cache. Nunca buscar um quadro de outra fase da animação.
   const views = viewsFor(recipe);
   const request = (tier: number, direction: number, urgent: boolean) => {
@@ -178,6 +175,7 @@ export function registerAnimalSpritePack<T extends SpritePack, A extends unknown
   const prefetch = (tier: number, direction: number) => {
     request(tier, recipe.asymmetric ? (direction + 15) % 16 : direction - 1, false);
     request(tier, recipe.asymmetric ? (direction + 1) % 16 : direction + 1, false);
+    if (hasAnimalSpriteAtlas(recipe, tier)) return;
     request(tier - 1, direction, false);
     request(tier + 1, direction, false);
   };
@@ -187,8 +185,10 @@ export function registerAnimalSpritePack<T extends SpritePack, A extends unknown
       + (recipe.asymmetric ? Math.min(horizontal, 16 - horizontal) : horizontal);
   };
   pack.getView = (tier, direction, budgetAware, allowNull) => {
-    if (!submit) return original(tier, direction, budgetAware, allowNull);
-    family.view = { tier, direction };
+    const stored = hasAnimalSpriteAtlas(recipe, tier);
+    // Os construtores usam uma vista provisória. A câmera escolhe a primeira vista a baixar.
+    if (stored && !spriteStreamingStarted) return allowNull ? null : loadingTexture;
+    if (!submit && !stored && !views.size) return original(tier, direction, budgetAware, allowNull);
     const key = tier * 32 + direction;
     if (!bank.readyViews.has(key) && bank.recipes.every(next => viewsFor(next).has(key))) bank.readyViews.add(key);
     const exact = views.get(key);
@@ -211,9 +211,10 @@ export function registerAnimalSpritePack<T extends SpritePack, A extends unknown
     if (nearest) {
       return nearest;
     }
-    // Só durante a preparação inicial, antes de Jogar, ainda pode faltar uma vista comum.
+    // Enquanto o ciclo é preparado, ainda pode faltar um ângulo comum a todas as poses.
     if (exact) { resolvedViews.set(pack, { tier, direction }); return exact; }
     for (const [candidate, tex] of views) {
+      if (candidate >= ANIMAL_ATLAS_TOP * 32) continue;
       const delta = viewDistance(candidate, tier, direction);
       if (delta < distance) {
         distance = delta; nearest = tex;
@@ -221,11 +222,27 @@ export function registerAnimalSpritePack<T extends SpritePack, A extends unknown
       }
     }
     if (nearest) return nearest;
+    if (stored) return allowNull ? null : loadingTexture;
     // Primeira vista desta pose: publicar um quadro correto, nunca congelar a animação.
     const initial = original(tier, direction, false, false);
     if (initial) { views.set(key, initial); resolvedViews.set(pack, { tier, direction }); prefetch(tier, direction); }
     return initial;
   };
+  const readPole = (tier: number, render: () => THREE.CanvasTexture) => {
+    const stored = views.get(tier * 32);
+    if (stored) return stored;
+    if (!hasAnimalSpriteAtlas(recipe, tier)) return render();
+    request(tier, 0, true);
+    return loadingTexture;
+  };
+  if (pack.getTop) {
+    const render = pack.getTop.bind(pack);
+    pack.getTop = () => readPole(ANIMAL_ATLAS_TOP, render);
+  }
+  if (pack.getBottom) {
+    const render = pack.getBottom.bind(pack);
+    pack.getBottom = () => readPole(ANIMAL_ATLAS_BOTTOM, render);
+  }
   if (pack.getSunView) {
     const originalShadow = pack.getSunView.bind(pack);
     const shadows = new Map<number, THREE.CanvasTexture>();

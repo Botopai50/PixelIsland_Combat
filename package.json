@@ -6,10 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/bake-animal-sprites.mjs dist",
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
-    "build:docs": "tsc --noEmit && vite build --outDir docs --emptyOutDir && node -e \"require('fs').writeFileSync('docs/.nojekyll','')\""
+    "build:docs": "tsc --noEmit && vite build --outDir docs --emptyOutDir && node scripts/bake-animal-sprites.mjs docs && node -e \"require('fs').writeFileSync('docs/.nojekyll','')\""
   },
   "dependencies": {
     "lil-gui": "^0.21.0",

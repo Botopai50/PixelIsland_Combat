@@ -1,16 +1,18 @@
 import { PILLBUG_IDLE, PILLBUG_WALK, PILLBUG_CURL, PILLBUG_W, PILLBUG_H, PILLBUG_PW, PILLBUG_PH, getPillBugPosePack, type PillBugPose } from '../enemies/PillBug';
 import * as THREE from 'three';
+import { readAnimalCatalogView } from '../enemies/AnimalSpriteCache';
+import { ANIMAL_ATLAS_TOP, ANIMAL_ATLAS_BOTTOM } from '../enemies/AnimalSpriteAtlasLayout';
 import { HERO_STYLE, HumanoidRig } from '../character/HumanoidRig';
 import { SkeletalBillboard, type HeroBodyPartKey } from '../character/SkeletalBillboard';
 import {
-  buildAntlerWardenPosePack, getAntlerWardenPosePack, WARDEN_CENTER, WARDEN_IDLE, WARDEN_PH, WARDEN_PW,
+  getAntlerWardenPosePack, WARDEN_CENTER, WARDEN_IDLE, WARDEN_PH, WARDEN_PW,
   WARDEN_SIZE, WARDEN_STOMP, WARDEN_STONES, WARDEN_SWEEP, WARDEN_WALK, type WardenPose,
 } from '../enemies/AntlerWardenSprites';
 import {
-  buildThornUrsaPosePack, getThornUrsaPosePack, URSA_CENTER, URSA_CHARGE, URSA_IDLE, URSA_PH, URSA_PW,
+  getThornUrsaPosePack, URSA_CENTER, URSA_CHARGE, URSA_IDLE, URSA_PH, URSA_PW,
   URSA_ROOTS, URSA_SIZE, URSA_SLAM, URSA_WALK, type UrsaPose,
 } from '../enemies/ThornUrsaSprites';
-import { buildTravelerPosePack, getTravelerPosePack, TRAVELER_CENTER, TRAVELER_IDLE, TRAVELER_PH, TRAVELER_PW, TRAVELER_SIZE, TRAVELER_TALK, type TravelerPose } from '../enemies/TravelerSprites';
+import { getTravelerPosePack, TRAVELER_CENTER, TRAVELER_IDLE, TRAVELER_PH, TRAVELER_PW, TRAVELER_SIZE, TRAVELER_TALK, type TravelerPose } from '../enemies/TravelerSprites';
 import type { EightWayTier } from '../character/HeroBillboardSprites';
 import {
   BOAR_H, BOAR_PH, BOAR_PPU, BOAR_PW, BOAR_W,
@@ -208,7 +210,6 @@ interface CreatureConfig {
   centerY: number;
   camDist: number;
   getPack: (pose: string) => Boar27Pack;
-  getSheetPack?: (pose: string) => Boar27Pack;
   anims: CreatureAnimDef[];
   poses: { key: string; label: string }[];
 }
@@ -224,14 +225,12 @@ function defineCreature<P extends string>(cfg: {
   centerY: number;
   camDist: number;
   getPack: (pose: P) => Boar27Pack;
-  getSheetPack?: (pose: P) => Boar27Pack;
   anims: CreatureAnimDef<P>[];
   poses: readonly P[];
 }): CreatureConfig {
   return {
     ...cfg,
     getPack: (p) => cfg.getPack(p as P),
-    getSheetPack: cfg.getSheetPack && ((p) => cfg.getSheetPack!(p as P)),
     poses: cfg.poses.map((key) => ({ key, label: key })),
   };
 }
@@ -400,7 +399,7 @@ const CREATURES: Record<Exclude<EntityKey, 'hero'>, CreatureConfig> = {
   traveler: defineCreature<TravelerPose>({
     key: 'traveler', label: 'Bento, o viajante',
     pw: TRAVELER_PW, ph: TRAVELER_PH, ppu: ANIMAL_PPU, worldW: TRAVELER_SIZE, worldH: TRAVELER_SIZE,
-    centerY: TRAVELER_CENTER, camDist: 3.4, getPack: getTravelerPosePack, getSheetPack: buildTravelerPosePack,
+    centerY: TRAVELER_CENTER, camDist: 3.4, getPack: getTravelerPosePack,
     anims: [
       { id: 'c_idle', label: '▶ Parado', frames: [...TRAVELER_IDLE], fps: 2.6, isCycle: true },
       { id: 'c_talk', label: '▶ Conversando', frames: [...TRAVELER_TALK], fps: 4.2, isCycle: true },
@@ -410,7 +409,7 @@ const CREATURES: Record<Exclude<EntityKey, 'hero'>, CreatureConfig> = {
   antler_warden: defineCreature<WardenPose>({
     key: 'antler_warden', label: 'Guardião Galhudo',
     pw: WARDEN_PW, ph: WARDEN_PH, ppu: ANIMAL_PPU, worldW: WARDEN_SIZE, worldH: WARDEN_SIZE,
-    centerY: WARDEN_CENTER, camDist: 12.4, getPack: getAntlerWardenPosePack, getSheetPack: buildAntlerWardenPosePack,
+    centerY: WARDEN_CENTER, camDist: 12.4, getPack: getAntlerWardenPosePack,
     anims: [
       { id: 'c_idle', label: '▶ Parado', frames: [...WARDEN_IDLE], fps: 2, isCycle: true },
       { id: 'c_walk', label: '▶ Caminhada', frames: [...WARDEN_WALK], fps: 6, isCycle: true },
@@ -423,7 +422,7 @@ const CREATURES: Record<Exclude<EntityKey, 'hero'>, CreatureConfig> = {
   thorn_ursa: defineCreature<UrsaPose>({
     key: 'thorn_ursa', label: 'Urso de Espinhos',
     pw: URSA_PW, ph: URSA_PH, ppu: ANIMAL_PPU, worldW: URSA_SIZE, worldH: URSA_SIZE,
-    centerY: URSA_CENTER, camDist: 6.7, getPack: getThornUrsaPosePack, getSheetPack: buildThornUrsaPosePack,
+    centerY: URSA_CENTER, camDist: 6.7, getPack: getThornUrsaPosePack,
     anims: [
       { id: 'c_idle', label: '▶ Parado', frames: [...URSA_IDLE], fps: 2.5, isCycle: true },
       { id: 'c_walk', label: '▶ Caminhada', frames: [...URSA_WALK], fps: 8, isCycle: true },
@@ -2252,34 +2251,37 @@ function buildHeroCatalog(bb: SkeletalBillboard): SpriteEntry[] {
   return list;
 }
 
-function buildCreatureCatalog(cfg: CreatureConfig, poseKey: string): SpriteEntry[] {
-  const pack = (cfg.getSheetPack ?? cfg.getPack)(poseKey);
-  const list: SpriteEntry[] = [];
+async function buildCreatureCatalog(cfg: CreatureConfig, poseKey: string): Promise<SpriteEntry[]> {
+  const pack = cfg.getPack(poseKey);
+  const list: Promise<SpriteEntry>[] = [];
   const prefix = `${cfg.key.toUpperCase()}_${poseKey.toUpperCase()}`;
 
-  const add = (code: string, angleLabel: string, pitchDeg: number, yawDeg: number, cond: string, tex: THREE.CanvasTexture, mirror?: string) => {
-    list.push({
-      id: `${cfg.key}_${poseKey}_${code}`,
-      codeName: `${prefix}_${code}`,
-      part: 'creature',
-      partLabel: `${cfg.label} · ${poseKey}`,
-      jointLabel: `${tex.image.width}×${tex.image.height} px`,
-      angleLabel,
-      pitchLabel: `${pitchDeg >= 0 ? '+' : ''}${pitchDeg}°`,
-      yawLabel: `${yawDeg}°`,
-      condition: cond,
-      mirrorNote: mirror,
-      camYawDeg: yawDeg,
-      camPitchDeg: pitchDeg,
-      targetY: cfg.centerY,
-      camDist: cfg.camDist,
-      w: tex.image.width,
-      h: tex.image.height,
-      dataUrl: texToDataUrl(tex),
-    });
+  const add = (code: string, angleLabel: string, pitchDeg: number, yawDeg: number, cond: string, tier: number, direction: number, mirror?: string) => {
+    list.push(readAnimalCatalogView(pack, tier, direction).then(tex => {
+      if (!tex) throw new Error(`Sprite indisponível: ${prefix}_${code}`);
+      return {
+        id: `${cfg.key}_${poseKey}_${code}`,
+        codeName: `${prefix}_${code}`,
+        part: 'creature',
+        partLabel: `${cfg.label} · ${poseKey}`,
+        jointLabel: `${tex.image.width}×${tex.image.height} px`,
+        angleLabel,
+        pitchLabel: `${pitchDeg >= 0 ? '+' : ''}${pitchDeg}°`,
+        yawLabel: `${yawDeg}°`,
+        condition: cond,
+        mirrorNote: mirror,
+        camYawDeg: yawDeg,
+        camPitchDeg: pitchDeg,
+        targetY: cfg.centerY,
+        camDist: cfg.camDist,
+        w: tex.image.width,
+        h: tex.image.height,
+        dataUrl: texToDataUrl(tex),
+      };
+    }));
   };
 
-  if (!pack.asymmetric) add('TOP', 'Topo (+88°)', 88, 0, 'Vista polar', pack.getTop());
+  if (!pack.asymmetric) add('TOP', 'Topo (+88°)', 88, 0, 'Vista polar', ANIMAL_ATLAS_TOP, 0);
 
   const tiers: { idx: number; code: string; label: string; cond: string }[] = [
     { idx: 0, code: 'P80',   label: 'Bem alto (+80°)',   cond: 'pitch ≈ +80° (9 alturas · passo 20°)' },
@@ -2306,14 +2308,14 @@ function buildCreatureCatalog(cfg: CreatureConfig, poseKey: string): SpriteEntry
         pitch,
         yaw,
         `${t.cond} · 16 direções (passo 22.5°)`,
-        pack.getView(t.idx, d)!,
+        t.idx, d,
         mirror,
       );
     }
   }
 
-  if (!pack.asymmetric) add('BOTTOM', 'Por baixo (-88°)', -88, 0, 'Vista polar', pack.getBottom());
-  return list;
+  if (!pack.asymmetric) add('BOTTOM', 'Por baixo (-88°)', -88, 0, 'Vista polar', ANIMAL_ATLAS_BOTTOM, 0);
+  return Promise.all(list);
 }
 
 /**
@@ -2331,6 +2333,7 @@ export class SpriteInspector {
   private heroAnim: HeroAnimKey = 'idle';
   private creatureAnimId = 'c_idle';
   private creaturePose = 'idle0';
+  private sheetRequest = 0;
 
   private heroEntries: SpriteEntry[] = [];
   private activeEntries: SpriteEntry[] = [];
@@ -2629,6 +2632,7 @@ export class SpriteInspector {
 
   private selectEntity(key: EntityKey) {
     this.entity = key;
+    this.sheetRequest++;
     this.locked = null;
     this.hudLockEl.classList.add('hidden');
 
@@ -2749,13 +2753,22 @@ export class SpriteInspector {
     void cfg;
   }
 
-  private rebuildCreatureSheet(cfg: CreatureConfig, instantCamera: boolean) {
+  private async rebuildCreatureSheet(cfg: CreatureConfig, instantCamera: boolean) {
     if (!cfg.poses.some((p) => p.key === this.creaturePose)) {
       const activeAnim = cfg.anims.find((a) => a.id === this.creatureAnimId) ?? cfg.anims[0];
       this.creaturePose = activeAnim?.frames[0] ?? cfg.poses[0].key;
       this.syncCreaturePoseButtons(cfg);
     }
-    this.activeEntries = buildCreatureCatalog(cfg, this.creaturePose);
+    const request = ++this.sheetRequest;
+    this.listEl.textContent = 'Carregando sprites…';
+    try {
+      const entries = await buildCreatureCatalog(cfg, this.creaturePose);
+      if (request !== this.sheetRequest) return;
+      this.activeEntries = entries;
+    } catch {
+      if (request === this.sheetRequest) this.listEl.textContent = 'Não foi possível carregar os sprites.';
+      return;
+    }
     this.renderCreatureSheet(cfg);
     // Mantém o ângulo aproximado ou foca 3/4 frente
     const prefix = `${cfg.key.toUpperCase()}_${this.creaturePose.toUpperCase()}`;

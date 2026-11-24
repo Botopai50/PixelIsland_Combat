@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { initAnimalSpriteWorkers } from '../engine/enemies/AnimalSpriteWorkers';
-import { waitForAnimalSprites } from '../engine/enemies/AnimalSpriteCache';
+import { startAnimalSpriteStreaming } from '../engine/enemies/AnimalSpriteCache';
 import { loadTuning } from '../engine/core/Tuning';
 import { GameClock } from '../engine/core/GameClock';
 import { Input } from '../engine/core/Input';
@@ -381,9 +381,6 @@ export class Game {
       else document.documentElement.requestFullscreen?.().catch(() => {});
       this.hud.toast('Bem-vindo! H = ajuda · P = ajustes · M = sprites', 'info');
     });
-    const playButton = start.querySelector<HTMLButtonElement>('.go')!;
-    playButton.disabled = true;
-    playButton.textContent = 'Preparando animações…';
     window.addEventListener('pointerdown', () => ctx.sound.unlock(), { once: true });
 
     window.addEventListener('resize', () => this.resize());
@@ -394,10 +391,7 @@ export class Game {
     this.spawnThornUrsa();
     this.spawnAntlerWarden();
     this.spawnInitialWildlife();
-    void waitForAnimalSprites().then(() => {
-      playButton.disabled = false;
-      playButton.textContent = this.isTouch ? 'Tocar para jogar' : 'Clique para jogar';
-    });
+    startAnimalSpriteStreaming();
     renderer.setAnimationLoop(() => this.frame());
   }
 

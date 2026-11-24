@@ -12,14 +12,17 @@ Roda no navegador de **desktop** (teclado + mouse) e de **celular** (controles d
 
 ## Como rodar
 
-Requisitos: Node.js 18+ (testado com Node 22).
+Requisitos: Node.js 22.18+.
 
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento (http://localhost:5173) — acessível na rede local
-npm run build      # typecheck + build de produção em dist/
+npm run build      # typecheck, build de produção e geração dos atlas em dist/
 npm run preview    # serve o build (http://localhost:4173)
 ```
+
+O build grava os quadros dos animais, monstros e Bento em `sprites/<espécie>/`.
+O jogo carrega sob demanda os atlas compactados para a altura da câmera.
 
 Para testar no celular: rode `npm run dev` e abra, no celular (mesma rede Wi-Fi), o endereço
 "Network" que o Vite mostra no terminal. Use o aparelho na horizontal; o botão de início pede tela cheia.
