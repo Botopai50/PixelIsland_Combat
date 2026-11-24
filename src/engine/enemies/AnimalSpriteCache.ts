@@ -25,8 +25,15 @@ const registered = new WeakSet<object>();
 const sharedViews = new Map<string, Map<number, THREE.CanvasTexture>>();
 const pendingViews = new WeakMap<Map<number, THREE.CanvasTexture>, Set<number>>();
 const resolvedViews = new WeakMap<object, SpriteView>();
-const families = new Map<string, { view: SpriteView; ready: Promise<void>; recipes: SpriteRecipe[] }>();
+const families = new Map<string, SpriteFamily>();
 const animationBanks = new Map<string, { recipes: SpriteRecipe[]; readyViews: Set<number> }>();
+interface SpriteFamily {
+  recipes: SpriteRecipe[];
+  view: SpriteView;
+  ready: Promise<void>;
+  detail: Map<number, string>;
+}
+const packFamilies = new WeakMap<object, SpriteFamily>();
 const packBanks = new WeakMap<object, { recipes: SpriteRecipe[]; readyViews: Set<number> }>();
 const packRecipes = new WeakMap<object, SpriteRecipe>();
 const factories = new Map<string, (args: unknown[]) => SpritePack>();
@@ -50,7 +57,7 @@ function markReadyViews(bank: { recipes: SpriteRecipe[]; readyViews: Set<number>
 // Só as vistas detalhadas entram neste cache. As vistas leves continuam disponíveis
 // durante uma troca de ângulo, mesmo quando o orçamento de textura está ocupado.
 const densityViews = new Map<string, THREE.CanvasTexture>();
-const densityPending = new Set<string>();
+const densityPending = new Map<string, Promise<THREE.CanvasTexture | undefined>>();
 const densityCacheLimit = 96 * 1024 * 1024;
 // A textura precisa de pelo menos uma linha por célula na tela. Estes degraus
 // evitam uma nova textura a cada movimento da câmera.
@@ -68,15 +75,49 @@ function cacheDensityView(key: string, texture: THREE.CanvasTexture) {
   }
 }
 
-function requestDensityView(recipe: SpriteRecipe, view: SpriteView, key: string, resolution: SpriteResolution) {
-  if (!submit || densityPending.has(key) || densityPending.size >= 12) return;
-  densityPending.add(key);
+function requestDensityView(
+  recipe: SpriteRecipe, view: SpriteView, key: string, resolution: SpriteResolution, urgent = false,
+) {
+  const pending = densityPending.get(key);
+  if (pending) return pending;
+  if (!submit || (!urgent && densityPending.size >= 12)) return undefined;
+  let finish!: (texture: THREE.CanvasTexture | undefined) => void;
+  const result = new Promise<THREE.CanvasTexture | undefined>(resolve => { finish = resolve; });
+  densityPending.set(key, result);
   const accepted = submit({ ...recipe, resolution }, view, pixels => {
     densityPending.delete(key);
-    if (!pixels || pixels.width !== resolution.width || pixels.height !== resolution.height) return;
-    cacheDensityView(key, textureFromPixels(pixels));
-  }, !!recipe.turn);
-  if (!accepted) densityPending.delete(key);
+    if (!pixels || pixels.width !== resolution.width || pixels.height !== resolution.height) {
+      finish(undefined);
+      return;
+    }
+    const texture = textureFromPixels(pixels);
+    cacheDensityView(key, texture);
+    finish(texture);
+  }, urgent || (!!recipe.turn && resolution.height <= 160));
+  if (accepted) return result;
+  densityPending.delete(key);
+  finish(undefined);
+  return undefined;
+}
+
+function densitySuffix(view: SpriteView, { width, height }: SpriteResolution) {
+  return `:${width}x${height}:${view.tier}:${view.direction}`;
+}
+
+export function getReadyAnimalSprite(pack: SpritePack, view: SpriteView, resolution: SpriteResolution) {
+  const recipe = packRecipes.get(pack);
+  return recipe && densityViews.get(recipeKey(recipe) + densitySuffix(view, resolution));
+}
+
+export function requestAnimalSprite(
+  pack: SpritePack, view: SpriteView, resolution: SpriteResolution,
+): Promise<THREE.CanvasTexture | undefined> | undefined {
+  const recipe = packRecipes.get(pack);
+  if (!recipe || !pack.renderView) return undefined;
+  const key = recipeKey(recipe) + densitySuffix(view, resolution);
+  const ready = getReadyAnimalSprite(pack, view, resolution);
+  if (ready) return Promise.resolve(ready);
+  return requestDensityView(recipe, view, key, resolution, true);
 }
 
 export function getAnimalTurnTexture(
@@ -128,18 +169,22 @@ export function getAnimalDensityTexture(
   if (!submit || !pack.renderView || !recipe || !view) return fallback;
 
   const needed = densityLevels.find(limit => limit >= visibleRows / .85) ?? Infinity;
-  const bank = packBanks.get(pack);
-  const frames = bank?.recipes.length ? bank.recipes : [recipe];
+  // Idle, caminhada e ataques precisam trocar juntos. Se só o ciclo atual
+  // promovesse, trocar de ação faria o mesmo ser voltar aos pixels grandes.
+  const family = packFamilies.get(pack);
+  const frames = family?.recipes.length ? family.recipes : [recipe];
   const nativeLevel = densityLevels.find(level => level >= resolution.height) ?? Infinity;
   const preferredLevel = Math.min(needed, nativeLevel);
   let ready: THREE.CanvasTexture | undefined;
+  let displayedLevel = 0;
   for (let i = densityLevels.indexOf(preferredLevel); i >= 0; i--) {
     const level = densityLevels[i];
     const height = Math.min(resolution.height, level);
     if (height < source.height && height !== resolution.height) break;
     const width = Math.max(1, Math.round(resolution.width * height / resolution.height));
     if (height === source.height && width === source.width) continue;
-    const suffix = `:${width}x${height}:${view.tier}:${view.direction}`;
+    const size = { width, height };
+    const suffix = densitySuffix(view, size);
     let complete = true;
     for (const frame of frames) {
       const frameKey = recipeKey(frame) + suffix;
@@ -148,17 +193,49 @@ export function getAnimalDensityTexture(
         densityViews.delete(frameKey);
         densityViews.set(frameKey, texture);
       } else {
-        if (level === preferredLevel) requestDensityView(frame, view, frameKey, { width, height });
         complete = false;
       }
     }
-    // Só trocar quando todas as poses do ciclo estiverem na mesma densidade.
+    // A densidade vale para todos os quadros do ser neste ângulo.
     if (complete) {
       ready = densityViews.get(recipeKey(recipe) + suffix);
-      if (ready) break;
+      if (ready) {
+        displayedLevel = level;
+        family?.detail.set(view.tier * 32 + view.direction, suffix);
+        break;
+      }
+    }
+  }
+  // First make the same moderate detail available to every pose, then fill
+  // the closest tier. This avoids queuing dozens of large renders on approach.
+  const nextLevel = displayedLevel < 160 && source.height < 160 ? Math.min(preferredLevel, 160) : preferredLevel;
+  if (nextLevel > displayedLevel) {
+    const height = Math.min(resolution.height, nextLevel);
+    const width = Math.max(1, Math.round(resolution.width * height / resolution.height));
+    if (height !== source.height || width !== source.width) {
+      const size = { width, height };
+      const suffix = densitySuffix(view, size);
+      let pending = 0;
+      for (const frame of frames) {
+        const key = recipeKey(frame) + suffix;
+        if (densityPending.has(key)) pending++;
+      }
+      for (const frame of frames) {
+        if (pending >= 4) break;
+        const key = recipeKey(frame) + suffix;
+        if (!densityViews.has(key) && !densityPending.has(key) && requestDensityView(frame, view, key, size)) pending++;
+      }
     }
   }
   return ready ?? fallback;
+}
+
+function hasDetailedView(family: SpriteFamily | undefined, key: number) {
+  const suffix = family?.detail.get(key);
+  if (!suffix || !family) return undefined;
+  if (family.recipes.every(frame => densityViews.has(recipeKey(frame) + suffix))) return suffix;
+  family.detail.delete(key);
+  return undefined;
 }
 
 export function getResolvedAnimalView(pack: object) { return resolvedViews.get(pack); }
@@ -192,6 +269,7 @@ export function animalRestPack<T extends SpritePack>(pack: T, elapsed: number): 
 export function ensureAnimalSpriteView(pack: object, tier: number, direction: number, urgent = true) {
   const family = packBanks.get(pack);
   if (!submit || !family) return true;
+  if (hasDetailedView(packFamilies.get(pack), tier * 32 + direction)) return true;
   const key = tier * 32 + direction;
   if (family.readyViews.has(key)) return true;
   if (family.recipes.every(next => viewsFor(next).has(key))) {
@@ -222,7 +300,7 @@ function prepareFamily(recipe: SpriteRecipe) {
   if (family) return family;
   const recipes = (ANIMAL_SPRITE_POSES[`${recipe.module}:${recipe.factory}`] ?? [String(recipe.args[0])])
     .map(pose => ({ ...recipe, args: [pose, ...recipe.args.slice(1)] }));
-  const state = { view: { tier: 4, direction: 0 }, ready: Promise.resolve(), recipes };
+  const state: SpriteFamily = { view: { tier: 4, direction: 0 }, ready: Promise.resolve(), recipes, detail: new Map() };
   family = state;
   families.set(key, state);
   state.ready = (async () => {
@@ -284,6 +362,8 @@ export function registerAnimalSpritePack<T extends SpritePack, A extends unknown
   if (!submit || registered.has(pack)) return pack;
   registered.add(pack);
   const family = prepareFamily(recipe);
+  if (!family.recipes.some(frame => recipeKey(frame) === recipeKey(recipe))) family.recipes.push(recipe);
+  packFamilies.set(pack, family);
   const cycle = String(recipe.args[0]).replace(/\d+$/, '');
   const bankKey = `${recipe.module}:${recipe.factory}:${JSON.stringify(recipe.args.slice(1))}:${cycle}`;
   let bank = animationBanks.get(bankKey);
@@ -320,6 +400,14 @@ export function registerAnimalSpritePack<T extends SpritePack, A extends unknown
       resolvedViews.set(pack, { tier, direction });
       prefetch(tier, direction);
       return exact;
+    }
+    // A vista detalhada já contém a ação no ângulo certo, mesmo se a fila
+    // das miniaturas ainda estiver preparando a versão leve desta ação.
+    const suffix = hasDetailedView(family, key);
+    const detailed = suffix && densityViews.get(recipeKey(recipe) + suffix);
+    if (detailed) {
+      resolvedViews.set(pack, { tier, direction });
+      return detailed;
     }
     // Preparar o ciclo atual em background; poses de outras ações não bloqueiam esta vista.
     for (const next of bank.recipes) requestView(next, tier, direction, true);

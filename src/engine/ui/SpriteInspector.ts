@@ -1,7 +1,7 @@
 import { PILLBUG_IDLE, PILLBUG_WALK, PILLBUG_CURL, PILLBUG_W, PILLBUG_H, PILLBUG_PW, PILLBUG_PH, getPillBugPosePack, type PillBugPose } from '../enemies/PillBug';
 import * as THREE from 'three';
 import { ACTOR_PIXELS_PER_METER, actorScreenPixelSize, actorSpriteResolution } from '../character/ActorPixelGrid';
-import { getAnimalDensityTexture, getAnimalTurnTexture } from '../enemies/AnimalSpriteCache';
+import { getAnimalDensityTexture, getAnimalTurnTexture, getReadyAnimalSprite, getResolvedAnimalView, requestAnimalSprite, type SpriteView } from '../enemies/AnimalSpriteCache';
 import { previewAnimalTurn } from '../enemies/AnimalTurnPose';
 import { HERO_STYLE, HumanoidRig } from '../character/HumanoidRig';
 import { SkeletalBillboard, type HeroBodyPartKey } from '../character/SkeletalBillboard';
@@ -176,6 +176,7 @@ interface SpriteEntry {
   w: number;
   h: number;
   dataUrl: string;
+  creatureView?: SpriteView;
 }
 
 type EntityKey =
@@ -2271,9 +2272,10 @@ function buildCreatureCatalog(cfg: CreatureConfig, poseKey: string): SpriteEntry
   const prefix = `${cfg.key.toUpperCase()}_${poseKey.toUpperCase()}`;
   const native = creatureWorldResolution(cfg);
 
-  const add = (code: string, angleLabel: string, pitchDeg: number, yawDeg: number, cond: string, tex: THREE.CanvasTexture, mirror?: string) => {
+  const add = (code: string, angleLabel: string, pitchDeg: number, yawDeg: number, cond: string, tex: THREE.CanvasTexture, view: SpriteView, mirror?: string) => {
     list.push({
       id: `${cfg.key}_${poseKey}_${code}`,
+      creatureView: view,
       codeName: `${prefix}_${code}`,
       part: 'creature',
       partLabel: `${cfg.label} · ${poseKey}`,
@@ -2293,7 +2295,7 @@ function buildCreatureCatalog(cfg: CreatureConfig, poseKey: string): SpriteEntry
     });
   };
 
-  if (!pack.asymmetric) add('TOP', 'Topo (+88°)', 88, 0, 'Vista polar', pack.getTop());
+  if (!pack.asymmetric) add('TOP', 'Topo (+88°)', 88, 0, 'Vista polar', pack.getTop(), { tier: CREATURE_PITCHES.length, direction: 0 });
 
   const tiers: { idx: number; code: string; label: string; cond: string }[] = [
     { idx: 0, code: 'P80',   label: 'Bem alto (+80°)',   cond: 'pitch ≈ +80° (9 alturas · passo 20°)' },
@@ -2321,12 +2323,13 @@ function buildCreatureCatalog(cfg: CreatureConfig, poseKey: string): SpriteEntry
         yaw,
         `${t.cond} · 16 direções (passo 22.5°)`,
         pack.getView(t.idx, d)!,
+        { tier: t.idx, direction: d },
         mirror,
       );
     }
   }
 
-  if (!pack.asymmetric) add('BOTTOM', 'Por baixo (-88°)', -88, 0, 'Vista polar', pack.getBottom());
+  if (!pack.asymmetric) add('BOTTOM', 'Por baixo (-88°)', -88, 0, 'Vista polar', pack.getBottom(), { tier: CREATURE_PITCHES.length + 1, direction: 0 });
   return list;
 }
 
@@ -2348,6 +2351,7 @@ export class SpriteInspector {
 
   private heroEntries: SpriteEntry[] = [];
   private activeEntries: SpriteEntry[] = [];
+  private spriteDetailTimer = 0;
   private cardEls = new Map<string, HTMLButtonElement>();
   private hovered: SpriteEntry | null = null;
   private locked: SpriteEntry | null = null;
@@ -2530,6 +2534,7 @@ export class SpriteInspector {
   }
 
   close() {
+    window.clearTimeout(this.spriteDetailTimer);
     if (!this.open) return;
     this.open = false;
     this.root.classList.add('hidden');
@@ -2774,12 +2779,14 @@ export class SpriteInspector {
       this.syncCreaturePoseButtons(cfg);
     }
     this.activeEntries = buildCreatureCatalog(cfg, this.creaturePose);
+    this.locked = this.locked && this.activeEntries.find(entry => entry.id === this.locked?.id) || null;
+    this.hudLockEl.classList.toggle('hidden', !this.locked);
     this.renderCreatureSheet(cfg);
     // Mantém o ângulo aproximado ou foca 3/4 frente
     const prefix = `${cfg.key.toUpperCase()}_${this.creaturePose.toUpperCase()}`;
     const def = this.activeEntries.find((e) => e.codeName === `${prefix}_LEVEL_D2`) ?? this.activeEntries[0];
     this.hovered = def;
-    this.focusEntry(def, instantCamera);
+    this.focusEntry(this.locked ?? def, instantCamera);
   }
 
   private addSheetSection(
@@ -2960,14 +2967,36 @@ export class SpriteInspector {
     }
 
     this.infoThumbEl.src = entry.dataUrl;
-    const thumbnail = entry.part === 'creature' ? 'prévia ' : '';
-    this.infoNameEl.textContent = `${entry.codeName} (${thumbnail}${entry.w}×${entry.h} px)`;
+    this.infoNameEl.textContent = `${entry.codeName} (${entry.w}×${entry.h} px)`;
+    this.loadSpriteDetail(entry);
     this.infoPartEl.textContent = `${entry.partLabel} · ${entry.jointLabel}`;
     this.infoAngleEl.textContent = `Ângulo: ${entry.angleLabel}${entry.mirrorNote ? ` — ${entry.mirrorNote}` : ''}`;
     this.infoCondEl.textContent = `Regra: ${entry.condition}`;
     this.hudPartEl.textContent = `${entry.partLabel}`;
 
     this.syncCardStates();
+  }
+
+  private loadSpriteDetail(entry: SpriteEntry) {
+    window.clearTimeout(this.spriteDetailTimer);
+    if (this.entity === 'hero' || !entry.creatureView) return;
+    const cfg = CREATURES[this.entity];
+    const native = creatureWorldResolution(cfg);
+    if (entry.w === native.width && entry.h === native.height) return;
+    this.infoNameEl.textContent = `${entry.codeName} (prévia ${entry.w}×${entry.h} px)`;
+    const pack = cfg.getPack(this.creaturePose);
+    const view = entry.creatureView;
+    this.spriteDetailTimer = window.setTimeout(async () => {
+      const texture = await requestAnimalSprite(pack, view, native);
+      if (!texture || (this.locked ?? this.hovered) !== entry || !this.open) return;
+      entry.dataUrl = texToDataUrl(texture);
+      entry.w = texture.image.width;
+      entry.h = texture.image.height;
+      this.infoThumbEl.src = entry.dataUrl;
+      this.infoNameEl.textContent = `${entry.codeName} (${entry.w}×${entry.h} px)`;
+      const thumbnail = this.cardEls.get(entry.id)?.querySelector('img');
+      if (thumbnail) thumbnail.src = entry.dataUrl;
+    }, 150);
   }
 
   private bindStageOrbit() {
@@ -3099,7 +3128,11 @@ export class SpriteInspector {
       const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) * .5);
       const depth = Math.max(.5, this.tmp.subVectors(this.creatureMesh.position, this.camPos).dot(this.camFwd));
       const visibleRows = bufH * cfg.worldH / (2 * depth * tanHalfFov * p);
-      const normal = getAnimalDensityTexture(pack, tex, resolution, visibleRows, isPolar ? Math.sign(upDot) : 0);
+      const view = isPolar
+        ? { tier: CREATURE_PITCHES.length + Number(upDot < 0), direction: 0 }
+        : getResolvedAnimalView(pack);
+      const selected = !this.creatureAnimId && view ? getReadyAnimalSprite(pack, view, resolution) : undefined;
+      const normal = selected ?? getAnimalDensityTexture(pack, tex, resolution, visibleRows, isPolar ? Math.sign(upDot) : 0);
       const turnTexture = turning?.pose && !isPolar
         ? getAnimalTurnTexture(pack, normal.image, visibleRows, turning.pose, flipX) : undefined;
       const sample = this.renderer.domElement.dataset;
