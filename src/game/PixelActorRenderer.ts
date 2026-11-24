@@ -10,9 +10,12 @@ export function actorPixelSize(bufferHeight: number) {
   return Math.max(1, Math.round(bufferHeight * referencePixelsPerTexel));
 }
 
+export const ACTOR_SAMPLES_PER_CELL = 2;
+
 export class PixelActorRenderer {
   readonly camera = new THREE.PerspectiveCamera();
   readonly size = new THREE.Vector2();
+  readonly sampleSize = new THREE.Vector2();
   private readonly buffer = new THREE.Vector2();
   private readonly gridProjection = new THREE.Matrix4();
   private readonly target: THREE.WebGLRenderTarget;
@@ -35,18 +38,37 @@ export class PixelActorRenderer {
         uSize: { value: this.size },
         uCell: this.cell,
       },
+      defines: { SOLID_ACTORS: 1 },
       vertexShader: 'void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }',
       fragmentShader: /* glsl */ `
         uniform sampler2D uColor;
         uniform sampler2D uDepth;
         uniform vec2 uSize;
         uniform float uCell;
+        float surfaceDepth(vec2 uv, float coverage) {
+          return coverage > 0.0 ? texture2D(uDepth, uv).r : 1.0;
+        }
         void main() {
-          vec2 uv = (floor(gl_FragCoord.xy / uCell) + 0.5) / uSize;
-          vec4 color = texture2D(uColor, uv);
-          if (color.a == 0.0) discard;
-          gl_FragDepth = texture2D(uDepth, uv).r;
-          gl_FragColor = vec4(color.rgb / color.a, color.a);
+          vec2 cell = floor(gl_FragCoord.xy / uCell);
+          vec2 step = 0.5 / uSize;
+          vec2 a = (cell + 0.25) / uSize;
+          vec2 b = a + vec2(step.x, 0.0);
+          vec2 c = a + vec2(0.0, step.y);
+          vec2 d = a + step;
+          vec4 ca = texture2D(uColor, a);
+          vec4 cb = texture2D(uColor, b);
+          vec4 cc = texture2D(uColor, c);
+          vec4 cd = texture2D(uColor, d);
+          vec4 color = (ca + cb + cc + cd) * 0.25;
+          #ifdef SOLID_ACTORS
+            if (color.a < 0.5) discard;
+            gl_FragDepth = min(min(surfaceDepth(a, ca.a), surfaceDepth(b, cb.a)),
+                               min(surfaceDepth(c, cc.a), surfaceDepth(d, cd.a)));
+            gl_FragColor = vec4(color.rgb / color.a, 1.0);
+          #else
+            if (color.a == 0.0) discard;
+            gl_FragColor = vec4(color.rgb / color.a, color.a);
+          #endif
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }
@@ -80,8 +102,9 @@ export class PixelActorRenderer {
     const width = Math.max(1, Math.ceil(this.buffer.x / cell));
     const height = Math.max(1, Math.ceil(this.buffer.y / cell));
     this.cell.value = cell;
-    this.target.setSize(width, height);
     this.size.set(width, height);
+    this.sampleSize.copy(this.size).multiplyScalar(ACTOR_SAMPLES_PER_CELL);
+    this.target.setSize(this.sampleSize.x, this.sampleSize.y);
 
     // A última célula pode ficar parcialmente fora da tela sem mudar o tamanho de nenhuma outra.
     const x = this.buffer.x / (width * cell);

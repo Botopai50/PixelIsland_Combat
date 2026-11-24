@@ -62,7 +62,7 @@ export class PlayerView {
   private pole = new THREE.Vector3();
   private yawQ = new THREE.Quaternion();
 
-  constructor(private ctx: GameContext, private player: PlayerController) {
+  constructor(private ctx: GameContext, private player: PlayerController, viewportSamples = 1) {
     this.animator = new HumanoidAnimator(this.rig);
     this.footIK = new FootIK(ctx.physics);
     this.animator.onFootstep = (_foot, intensity) => {
@@ -70,7 +70,7 @@ export class PlayerView {
       ctx.events.emit('footstep', { pos: p.clone(), surface: player.motor.surface, intensity: intensity * (1 - 0.75 * player.sneakAmount), player: true });
     };
     ctx.scene.add(this.rig.root);
-    this.billboard = new SkeletalBillboard(this.rig, 1);
+    this.billboard = new SkeletalBillboard(this.rig, viewportSamples);
     addToPixelActorLayer(this.billboard.root);
     ctx.scene.add(this.billboard.root);
     this.gearBillboards = new EquipmentBillboards(

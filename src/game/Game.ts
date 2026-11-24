@@ -105,7 +105,7 @@ import { TweakPanel } from '../engine/ui/TweakPanel';
 import { bladeSegmentWorld } from '../engine/combat/Attacks';
 import { TestArena } from '../arena/TestArena';
 import { createHelpOverlay, createStartOverlay } from './Overlays';
-import { PixelActorRenderer } from './PixelActorRenderer';
+import { ACTOR_SAMPLES_PER_CELL, PixelActorRenderer } from './PixelActorRenderer';
 import { exportModelsGLB } from './ExportModels';
 import { RigViewer } from '../engine/debug/RigViewer';
 import { rand } from '../engine/core/math';
@@ -197,7 +197,7 @@ export class Game {
     this.player = new PlayerController(ctx, this.camRig, this.inventory, this.projectiles);
     this.camRig.player = this.player;
     ctx.combat.add(this.player);
-    this.view = new PlayerView(ctx, this.player);
+    this.view = new PlayerView(ctx, this.player, ACTOR_SAMPLES_PER_CELL);
     this.rigViewer = new RigViewer(ctx.scene, this.view.rig);
     this.fpv = new FirstPersonView(ctx, this.player);
     this.enemies = new EnemyDirector(ctx);
@@ -847,7 +847,7 @@ export class Game {
     const cam = this.camRig.camera;
     this.actorRenderer.prepare(cam);
     const actorCamera = this.actorRenderer.camera;
-    const actorSize = this.actorRenderer.size;
+    const actorSize = this.actorRenderer.sampleSize;
     const first = this.camRig.blend > 0.5;
     this.view.visible = !first && this.camRig.headDistance > 0.6;
     this.view.update(pdt, actorCamera, actorSize);

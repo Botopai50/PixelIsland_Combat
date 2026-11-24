@@ -170,7 +170,7 @@ export class SkeletalBillboard {
   private readonly boneScale = new THREE.Vector3();
   private readonly basisMat = new THREE.Matrix4();
 
-  constructor(private readonly rig: HumanoidRig, private readonly viewportCell?: number) {
+  constructor(private readonly rig: HumanoidRig, private readonly viewportSamples?: number) {
     this.root.name = 'HeroSkeletalBillboard';
     this.sprites = createHeroSpriteSet();
 
@@ -355,7 +355,8 @@ export class SkeletalBillboard {
     const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
     const bufferWidth = Math.max(1, drawingBufferSize?.x ?? (typeof window === 'undefined' ? 1280 : window.innerWidth * dpr));
     const bufferHeight = Math.max(1, drawingBufferSize?.y ?? (typeof window === 'undefined' ? 720 : window.innerHeight * dpr));
-    const pixelSize = this.viewportCell ?? (bufferHeight >= 680 ? 2 : 1);
+    const pixelSize = this.viewportSamples === undefined && bufferHeight >= 680 ? 2 : 1;
+    const anchorStep = this.viewportSamples ?? pixelSize;
     this.pixelSizeUniform.value = pixelSize;
     this.bufferSizeUniform.value.set(bufferWidth, bufferHeight);
 
@@ -363,11 +364,11 @@ export class SkeletalBillboard {
     // Anchor the whole sprite to the character's world origin. The animated
     // pelvis bobs during a step and would otherwise nudge every body part.
     this.rig.root.getWorldPosition(this.anchorNdc).project(camera);
-    const cellX = (this.anchorNdc.x * .5 + .5) * bufferWidth / pixelSize - .5;
-    const cellY = (this.anchorNdc.y * .5 + .5) * bufferHeight / pixelSize - .5;
+    const cellX = (this.anchorNdc.x * .5 + .5) * bufferWidth / anchorStep - .5;
+    const cellY = (this.anchorNdc.y * .5 + .5) * bufferHeight / anchorStep - .5;
     this.pixelOffsetUniform.value.set(
-      (this.anchorX.sample(cellX) - cellX) * 2 * pixelSize / bufferWidth,
-      (this.anchorY.sample(cellY) - cellY) * 2 * pixelSize / bufferHeight,
+      (this.anchorX.sample(cellX) - cellX) * 2 * anchorStep / bufferWidth,
+      (this.anchorY.sample(cellY) - cellY) * 2 * anchorStep / bufferHeight,
     );
     this.rig.joints.chest.getWorldPosition(this.chestPos);
     this.rig.joints.neck.getWorldPosition(this.neckPos);
