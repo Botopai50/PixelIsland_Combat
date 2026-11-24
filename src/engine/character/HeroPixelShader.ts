@@ -15,6 +15,24 @@ void main() {
   vScreenCenter = ((center.xy / center.w + uPixelOffsetNdc) * 0.5 + 0.5) * uBufferSize;
   vec2 xAxis = clipFromLocal[0].xy * ndcToPixels;
   vec2 yAxis = clipFromLocal[1].xy * ndcToPixels;
+  #ifdef HEAD_GRID_CELL
+    float cell = float(HEAD_GRID_CELL);
+    vec2 texelCount = 1.0 / uTexelSize;
+    vec2 nativeSize = texelCount * cell;
+    vec2 ratio = vec2(length(xAxis), length(yAxis)) / nativeSize;
+    vec2 fit = smoothstep(vec2(0.65), vec2(0.84), ratio)
+             * (1.0 - smoothstep(vec2(1.28), vec2(1.55), ratio));
+    float roll = max(abs(xAxis.y), abs(yAxis.x)) / max(0.001, max(length(xAxis), length(yAxis)));
+    float alignment = min(fit.x, fit.y) * (1.0 - smoothstep(0.025, 0.20, roll));
+    // Near the reference scale, the whole 26×26 face moves from cell to cell.
+    // Keep the collar anchor centered and fade the alignment out during zoom and rolls.
+    vec2 nativeY = vec2(0.0, sign(yAxis.y) * nativeSize.y);
+    vec2 neckAlignedCenter = vScreenCenter + 0.5 * (nativeY - yAxis);
+    vec2 nativeOrigin = floor((neckAlignedCenter - 0.5 * nativeSize) / cell + 0.5) * cell;
+    vScreenCenter = mix(vScreenCenter, nativeOrigin + 0.5 * nativeSize, alignment);
+    xAxis = mix(xAxis, vec2(sign(xAxis.x) * nativeSize.x, 0.0), alignment);
+    yAxis = mix(yAxis, nativeY, alignment);
+  #endif
   vScreenAxes = vec4(xAxis, yAxis);
 
   // A cell sampled inside the texture can extend outside the quad. Express
@@ -24,7 +42,12 @@ void main() {
                                        abs(xAxis.x) + abs(xAxis.y)) / max(0.0001, det);
   vec2 pad = 1.0 + max(2.0 * uTexelSize, min(cellPadding, vec2(1.0)));
   gl_Position = clipFromLocal * vec4(position.xy * pad, position.z, 1.0);
-  gl_Position.xy += uPixelOffsetNdc * gl_Position.w;
+  #ifdef HEAD_GRID_CELL
+    vec2 screen = vScreenCenter + xAxis * position.x * pad.x + yAxis * position.y * pad.y;
+    gl_Position.xy = (2.0 * screen / uBufferSize - 1.0) * gl_Position.w;
+  #else
+    gl_Position.xy += uPixelOffsetNdc * gl_Position.w;
+  #endif
 }
 `;
 

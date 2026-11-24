@@ -219,6 +219,8 @@ export class SkeletalBillboard {
     const mapUniform = { value: texture };
     const highlightUniform = { value: 0.0 };
     const material = new THREE.ShaderMaterial({
+      defines: name === 'bb_head' && this.viewportSamples !== undefined
+        ? { HEAD_GRID_CELL: this.viewportSamples } : undefined,
       uniforms: {
         uMap: mapUniform,
         uTexelSize: { value: new THREE.Vector2(1 / meta.pixelWidth, 1 / meta.pixelHeight) },
