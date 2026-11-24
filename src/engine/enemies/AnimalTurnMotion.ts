@@ -3,7 +3,6 @@ export class AnimalTurnMotion {
   yaw = 0;
   velocity = 0;
   pivotPhase = 0;
-  headYaw = 0;
   private initialized = false;
   readonly maxSpeed = Math.PI * 1.35;
   private readonly acceleration = Math.PI * 5;
@@ -16,8 +15,6 @@ export class AnimalTurnMotion {
       const dt = Math.min(remaining, 1 / 120);
       remaining -= dt;
       const delta = Math.atan2(Math.sin(target - this.yaw), Math.cos(target - this.yaw));
-      const lookTarget = Math.max(-.82, Math.min(.82, delta));
-      this.headYaw += (lookTarget - this.headYaw) * (1 - Math.exp(-17 * dt));
       const desired = Math.sign(delta) * Math.min(this.maxSpeed, Math.sqrt(2 * this.acceleration * Math.abs(delta)));
       this.velocity += Math.max(-this.acceleration * dt, Math.min(this.acceleration * dt, desired - this.velocity));
       let step = this.velocity * dt;

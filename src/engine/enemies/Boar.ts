@@ -1,5 +1,4 @@
-import { bendAnimal, quantizeTurnPose, type AnimalTurnPose } from './AnimalTurnPose';
-import { registerAnimalSpritePack, getAnimalDensityTexture, getAnimalTurnTexture, isAnimalLocomotionPack, animalRestPack } from './AnimalSpriteCache';
+import { registerAnimalSpritePack, isAnimalLocomotionPack, animalRestPack } from './AnimalSpriteCache';
 import { AnimalMotionAnimation } from './AnimalMotionAnimation';
 import { AnimalViewAngles } from './AnimalViewAngles';
 import { AnimalTurnMotion } from './AnimalTurnMotion';
@@ -7,7 +6,6 @@ import { steerAnimalLocomotion } from './AnimalLocomotion';
 import { keepAnimalAboveGround } from './AnimalGrounding';
 import { sampleAnimalCycle } from './AnimalAnimation';
 import * as THREE from 'three';
-import { actorScreenPixelSize, actorSpriteResolution } from '../character/ActorPixelGrid';
 import type { GameContext } from '../core/Context';
 import type { Damageable, HitInfo, HitResult, Hurtbox, Team } from '../combat/types';
 import { emptyResult, newId } from '../combat/types';
@@ -253,7 +251,6 @@ export const BOAR_PH = 36;
 export const BOAR_PPU = 38;
 export const BOAR_W = BOAR_PW / BOAR_PPU; // 1.211m
 export const BOAR_H = BOAR_PH / BOAR_PPU; // 0.947m
-const boarResolution = actorSpriteResolution(BOAR_W, BOAR_H);
 const BOAR_EX = 1.00;
 const BOAR_EY = 0.78;
 
@@ -364,13 +361,8 @@ function evalBoarPose(x: number, y: number, z: number, P: BoarPoseParams): { d: 
   return { d: fur, mat: 'fur' };
 }
 
-function raymarchBoarView(
-  yawDeg: number, pitchDeg: number, isPole: boolean, P: BoarPoseParams, silhouetteOnly = false,
-  pw = BOAR_PW, ph = BOAR_PH, turn?: AnimalTurnPose,
-): THREE.CanvasTexture {
-  const ex = BOAR_EX, ey = BOAR_EY;
-  const sculpture = (x: number, y: number, z: number) => evalBoarPose(x, y, z, P);
-  const evaluate = turn ? bendAnimal(sculpture, ex, ey, 'quadruped', turn) : sculpture;
+function raymarchBoarView(yawDeg: number, pitchDeg: number, isPole: boolean, P: BoarPoseParams, silhouetteOnly = false): THREE.CanvasTexture {
+  const pw = BOAR_PW, ph = BOAR_PH, ex = BOAR_EX, ey = BOAR_EY;
   const yaw = (yawDeg * Math.PI) / 180;
   const pitch = (pitchDeg * Math.PI) / 180;
   const cbX = -Math.sin(yaw) * Math.cos(pitch);
@@ -431,7 +423,7 @@ function raymarchBoarView(
         const px3 = rx - cbX * t;
         const py3 = ry - cbY * t;
         const pz3 = rz - cbZ * t;
-        const res = evaluate(px3, py3, pz3);
+        const res = evalBoarPose(px3, py3, pz3, P);
         if (res.d < hitEps) {
           hitMat = res.mat;
           hitD = res.d;
@@ -465,9 +457,9 @@ function raymarchBoarView(
       }
 
       if (key !== 'k') {
-        const dx = evaluate(hx + eps, hyHit, hzHit).d - hitD;
-        const dy = evaluate(hx, hyHit + eps, hzHit).d - hitD;
-        const dz = evaluate(hx, hyHit, hzHit + eps).d - hitD;
+        const dx = evalBoarPose(hx + eps, hyHit, hzHit, P).d - hitD;
+        const dy = evalBoarPose(hx, hyHit + eps, hzHit, P).d - hitD;
+        const dz = evalBoarPose(hx, hyHit, hzHit + eps, P).d - hitD;
         const nl = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
         const ndl = (dx * lx + dy * ly + dz * lz) / nl;
 
@@ -537,11 +529,6 @@ const poseCache = new Map<BoarPoseName, CreatureViewPack>();
     const cache = new Map<number, THREE.CanvasTexture>();
     const sunCache = new Map<number, THREE.CanvasTexture>();
     pack = {
-      renderView(tier, direction, width, height, turn) {
-        const polar = tier >= CREATURE_PITCHES.length;
-        const pitch = polar ? (tier === CREATURE_PITCHES.length ? 88 : -88) : CREATURE_PITCHES[tier];
-        return raymarchBoarView(CREATURE_YAWS[direction], pitch, polar, P, false, width, height, turn);
-      },
       getTop() {
         if (!topTex) topTex = raymarchBoarView(0, 88, true, P);
         return topTex;
@@ -648,6 +635,7 @@ export class Boar implements Damageable {
   private lastTurnTime = NaN;
   private renderedFacing?: number;
   private readonly motionAnimation = new AnimalMotionAnimation();
+  private readonly turnQuat = new THREE.Quaternion();
   private moveYaw = 0;
   private gaitPhase = rand(0, Math.PI * 2);
   private idleClock = rand(0, 10);
@@ -755,7 +743,6 @@ export class Boar implements Damageable {
     this.hasTex = true;
     if (slot.mapUniform.value !== tex) {
       slot.mapUniform.value = tex;
-      slot.material.uniforms.uTexelSize.value.set(1 / tex.image.width, 1 / tex.image.height);
       const hadMap = !!slot.depthMaterial.map;
       slot.depthMaterial.map = tex;
       if (!hadMap) slot.depthMaterial.needsUpdate = true;
@@ -1046,20 +1033,16 @@ export class Boar implements Damageable {
     this.xAxis.crossVectors(this.yAxis, this.zAxis).normalize();
     this.basisMat.makeBasis(this.xAxis, this.yAxis, this.zAxis);
     this.bodySlot.mesh.quaternion.setFromRotationMatrix(this.basisMat);
-    this.bodySlot.mesh.position.set(this.position.x, baseY, this.position.z).addScaledVector(this.camBack, 0.02);
-    const p = actorScreenPixelSize(bufH);
-    const depth = Math.max(.5, this.tmp.subVectors(this.bodySlot.mesh.position, this.camPos).dot(this.camFwd));
-    const pixelsPerMeter = bufH / (2 * depth * tanHalfFov);
-    this.ndc.copy(this.bodySlot.mesh.position).project(camera);
-    if (tex) {
-      const visible = Math.abs(this.ndc.x) < 1 + BOAR_W * pixelsPerMeter / bufW
-        && Math.abs(this.ndc.y) < 1 + BOAR_H * pixelsPerMeter / bufH && Math.abs(this.ndc.z) <= 1;
-      const rows = BOAR_H * pixelsPerMeter / p;
-      const pose = visible && !isPolar && this.alive ? quantizeTurnPose(turn.headYaw, turn.pivotPhase) : undefined;
-      const normal = visible ? getAnimalDensityTexture(pack, tex, boarResolution, rows, isPolar ? Math.sign(upDot) : 0) : tex;
-      const turning = pose && getAnimalTurnTexture(pack, normal.image, rows, pose, flipX);
-      this.setSlotTex(this.bodySlot, turning ?? normal);
+    if (!isPolar) {
+      const bank = (fwdDot >= 0 ? -1 : 1) * (turn.velocity / turn.maxSpeed) * .12;
+      this.turnQuat.setFromAxisAngle(this.camBack, bank);
+      this.bodySlot.mesh.quaternion.premultiply(this.turnQuat);
     }
+    this.bodySlot.mesh.position.set(this.position.x, baseY, this.position.z).addScaledVector(this.camBack, 0.02);
+    if (tex) {
+      this.setSlotTex(this.bodySlot, tex);
+    }
+    // Mantém escala 1:1 uniforme para cada texel casar exatamente com 1 célula quadrada do grid pixel-snap
     this.bodySlot.mesh.scale.set(flipX ? -BOAR_W : BOAR_W, BOAR_H, 1);
     const groundLift = this.motor.grounded
       ? keepAnimalAboveGround(this.bodySlot.mesh, this.bodySlot.mapUniform.value, this.motor.groundY)
@@ -1078,6 +1061,8 @@ export class Boar implements Damageable {
     this.contactShadow.scale.set(0.84 * airFade, 1, 1.12 * airFade);
     (this.contactShadow.material as THREE.MeshBasicMaterial).opacity = airFade;
 
+    const partDepth = Math.max(0.5, this.tmp.subVectors(this.bodySlot.mesh.position, this.camPos).dot(this.camFwd));
+    const p = Math.max(1.5, bufH / (2 * partDepth * tanHalfFov * BOAR_PPU));
     this.bodySlot.pixelSizeUniform.value = p;
     this.ndc.copy(this.bodySlot.mesh.position).project(camera);
     const sxScreen = (this.ndc.x * 0.5 + 0.5) * bufW;

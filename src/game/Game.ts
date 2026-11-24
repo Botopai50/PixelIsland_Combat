@@ -494,7 +494,7 @@ export class Game {
 
   private spawnAntlerWarden() {
     if (this.monsters.some(monster => monster instanceof AntlerWarden && monster.alive)) return;
-    const enemy = new AntlerWarden(this.ctx, new THREE.Vector3(-17, 0, -15), this.renderer);
+    const enemy = new AntlerWarden(this.ctx, new THREE.Vector3(-17, 0, -15));
     this.monsters.push(enemy);
     this.ctx.combat.add(enemy);
   }

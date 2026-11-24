@@ -5,7 +5,6 @@ import { angleDelta, damp, dampAngle } from '../core/math';
 import { CharacterMotor } from '../physics/CharacterMotor';
 import { BasePixelAnimal } from './Animals';
 import { sampleAnimalCycle } from './AnimalAnimation';
-import { WardenBillboardRaster } from './WardenBillboardRaster';
 import {
   getAntlerWardenPosePack, WARDEN_CENTER, WARDEN_IDLE, WARDEN_PH, WARDEN_PW,
   WARDEN_SIZE, WARDEN_STOMP, WARDEN_STONES, WARDEN_SWEEP, WARDEN_WALK,
@@ -41,7 +40,6 @@ export class AntlerWarden extends BasePixelAnimal {
   get position() { return this.motor.position; }
 
   private readonly motor: CharacterMotor;
-  private readonly raster?: WardenBillboardRaster;
   private readonly home: THREE.Vector3;
   private readonly offset = new THREE.Vector3();
   private readonly ahead = new THREE.Vector3();
@@ -68,10 +66,9 @@ export class AntlerWarden extends BasePixelAnimal {
   private cycle = 0;
   private cooldown = 0;
 
-  constructor(ctx: GameContext, start: THREE.Vector3, renderer?: THREE.WebGLRenderer) {
+  constructor(ctx: GameContext, start: THREE.Vector3) {
     super(ctx, getAntlerWardenPosePack('idle0').getView(4, 0)!, WARDEN_PW, WARDEN_PH,
       WARDEN_SIZE, WARDEN_SIZE, 'AntlerWardenBillboard');
-    if (renderer) this.raster = new WardenBillboardRaster(renderer);
     this.hp = this.maxHp = 560;
     this.motor = new CharacterMotor(ctx.physics);
     this.motor.height = 4.7;
@@ -135,9 +132,7 @@ export class AntlerWarden extends BasePixelAnimal {
       : this.motor.horizontalSpeed > .25
         ? sampleAnimalCycle(WARDEN_WALK, this.stride)
         : sampleAnimalCycle(WARDEN_IDLE, this.age * .8);
-    const raster = this.raster;
-    this.renderBillboard(getAntlerWardenPosePack(pose), this.position.y + WARDEN_CENTER, camera, buffer,
-      raster && ((view, turn) => raster.render(pose, view, turn)));
+    this.renderBillboard(getAntlerWardenPosePack(pose), this.position.y + WARDEN_CENTER, camera, buffer);
   }
 
   private syncBody() {
@@ -283,7 +278,6 @@ export class AntlerWarden extends BasePixelAnimal {
     this.markerMaterial.dispose();
     this.fanMaterial.dispose();
     this.rubbleMaterial.dispose();
-    this.raster?.dispose();
     super.dispose();
   }
 }

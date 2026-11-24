@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { actorScreenPixelSize } from './ActorPixelGrid';
 import { HERO_PIXEL_SAMPLING, HERO_PIXEL_VERTEX } from './HeroPixelShader';
 import { StablePixelValue } from './StablePixelValue';
 import type { HumanoidRig, JointName } from './HumanoidRig';
@@ -171,9 +170,9 @@ export class SkeletalBillboard {
   private readonly boneScale = new THREE.Vector3();
   private readonly basisMat = new THREE.Matrix4();
 
-  constructor(private readonly rig: HumanoidRig, sprites = createHeroSpriteSet()) {
-    this.root.name = 'HumanoidSkeletalBillboard';
-    this.sprites = sprites;
+  constructor(private readonly rig: HumanoidRig) {
+    this.root.name = 'HeroSkeletalBillboard';
+    this.sprites = createHeroSpriteSet();
 
     // Keep the hero's 3D body meshes invisible to the main camera (`colorWrite/depthWrite: false`)
     // so they cast a true camera-independent 3D volumetric shadow while the 2D billboards render the pixel art!
@@ -356,7 +355,7 @@ export class SkeletalBillboard {
     const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
     const bufferWidth = Math.max(1, drawingBufferSize?.x ?? (typeof window === 'undefined' ? 1280 : window.innerWidth * dpr));
     const bufferHeight = Math.max(1, drawingBufferSize?.y ?? (typeof window === 'undefined' ? 720 : window.innerHeight * dpr));
-    const pixelSize = actorScreenPixelSize(bufferHeight);
+    const pixelSize = bufferHeight >= 680 ? 2 : 1;
     this.pixelSizeUniform.value = pixelSize;
     this.bufferSizeUniform.value.set(bufferWidth, bufferHeight);
 

@@ -1,5 +1,4 @@
-import { bendAnimal, quantizeTurnPose, type AnimalTurnPose, type animalTurnProfile } from './AnimalTurnPose';
-import { registerAnimalSpritePack, getResolvedAnimalView, ensureAnimalSpriteView, getAnimalDensityTexture, getAnimalTurnTexture, isAnimalLocomotionPack, animalRestPack, type SpriteView } from './AnimalSpriteCache';
+import { registerAnimalSpritePack, getResolvedAnimalView, ensureAnimalSpriteView, isAnimalLocomotionPack, animalRestPack } from './AnimalSpriteCache';
 import { AnimalMotionAnimation } from './AnimalMotionAnimation';
 import { AnimalViewAngles } from './AnimalViewAngles';
 import { AnimalTurnMotion } from './AnimalTurnMotion';
@@ -7,7 +6,6 @@ import { steerAnimalLocomotion } from './AnimalLocomotion';
 import { keepAnimalAboveGround } from './AnimalGrounding';
 import { sampleAnimalCycle } from './AnimalAnimation';
 import * as THREE from 'three';
-import { actorScreenPixelSize, actorSpriteResolution } from '../character/ActorPixelGrid';
 import type { GameContext } from '../core/Context';
 import type { Damageable, HitInfo, HitResult, Hurtbox, Team } from '../combat/types';
 import { emptyResult, newId } from '../combat/types';
@@ -256,10 +254,6 @@ void main() {
 
 export const CREATURE_FRAGMENT_SHADER = /* glsl */ `
 uniform sampler2D uMap;
-#ifdef RASTER_OUTLINE
-uniform float uRasterOutline;
-uniform vec2 uTexelSize;
-#endif
 uniform float uPixelSize;
 uniform vec2 uGridOrigin;
 uniform vec3 uFlashColor;
@@ -276,16 +270,6 @@ void main() {
   if (snappedUv.x < 0.0 || snappedUv.x > 1.0 || snappedUv.y < 0.0 || snappedUv.y > 1.0) discard;
 
   vec4 texel = texture2D(uMap, snappedUv);
-  #ifdef RASTER_OUTLINE
-  if (texel.a < 0.5 && uRasterOutline > .5) {
-    vec2 s = uTexelSize;
-    float edge = max(max(texture2D(uMap, snappedUv + vec2(s.x,0)).a,
-                         texture2D(uMap, snappedUv - vec2(s.x,0)).a),
-                     max(texture2D(uMap, snappedUv + vec2(0,s.y)).a,
-                         texture2D(uMap, snappedUv - vec2(0,s.y)).a));
-    texel = vec4(.0091, .0080, .0123, edge);
-  }
-  #endif
   if (texel.a < 0.5) discard;
 
   vec3 col = texel.rgb;
@@ -334,7 +318,7 @@ export function smin(a: number, b: number, k: number) {
 export type SdfEvaluator = (x: number, y: number, z: number) => { d: number; mat: string };
 export type ColorShaper = (mat: string, shade: number, x: number, y: number, z: number) => string;
 
-export function raymarchCreatureView(
+function raymarchCreatureView(
   pw: number,
   ph: number,
   ex: number,
@@ -346,7 +330,6 @@ export function raymarchCreatureView(
   evalFn: SdfEvaluator,
   shadeFn: ColorShaper,
   silhouetteOnly = false,
-  detailScale = 1,
 ): THREE.CanvasTexture {
   const t0 = performance.now();
   const yaw = (yawDeg * Math.PI) / 180;
@@ -379,8 +362,8 @@ export function raymarchCreatureView(
 
   const grid: string[] = new Array(pw * ph).fill('.');
   const Lx = -0.35, Ly = 0.78, Lz = 0.52;
-  const maxSteps = silhouetteOnly ? 14 : detailScale < 1 ? 24 : 18;
-  const hitEps = (silhouetteOnly ? .022 : .018) * detailScale;
+  const maxSteps = silhouetteOnly ? 14 : 18;
+  const hitEps = silhouetteOnly ? 0.022 : 0.018;
   const du = (2 * ex) / pw;
   const dv = (2 * ey) / ph;
   const skipDist = Math.max(du, dv) * 2.5;
@@ -440,7 +423,7 @@ export function raymarchCreatureView(
       return;
     }
 
-    const e = .02 * detailScale;
+    const e = 0.02;
     const nx = evalFn(hx + e, hy, hz).d - hitD;
     const ny = evalFn(hx, hy + e, hz).d - hitD;
     const nz = evalFn(hx, hy, hz + e).d - hitD;
@@ -522,13 +505,15 @@ export const CREATURE_PITCHES = [
  */
 export interface CreatureViewPack {
   readonly asymmetric?: boolean;
-  renderView?(tier: number, direction: number, width: number, height: number, turn?: AnimalTurnPose, profile?: ReturnType<typeof animalTurnProfile>): THREE.CanvasTexture;
   getTop(): THREE.CanvasTexture;
   getBottom(): THREE.CanvasTexture;
   getView(tierIdx: number, dirIdx: number, budgetAware?: boolean, allowNullOnBudget?: boolean): THREE.CanvasTexture | null;
   /** Vista renderizada exatamente no pitch do Sol para que cada pata coincida com sua sombra no chão. */
   getSunView(dirIdx: number, sunPitchDeg: number, budgetAware?: boolean): THREE.CanvasTexture | null;
 }
+
+export const HERO_MATCH_PPU = 56;
+export const ANIMAL_DENSITY_SCALE = HERO_MATCH_PPU / ANIMAL_PPU;
 
 export function build27Pack(
   pw: number, ph: number, ex: number, ey: number,
@@ -537,9 +522,9 @@ export function build27Pack(
   shadeFn: ColorShaper,
   asymmetric = false,
 ): CreatureViewPack {
-  // Vistas leves para a distância e para enquanto o worker prepara o sprite na escala do mundo.
-  const bw = Math.min(96, Math.max(8, pw));
-  const bh = Math.min(96, Math.max(8, ph));
+  // Bakeia os sprites SDF na mesma densidade de pixel do herói (56 PPU), limitado a 96px para manter 60 FPS.
+  const bw = Math.min(96, Math.max(8, Math.round(pw * ANIMAL_DENSITY_SCALE)));
+  const bh = Math.min(96, Math.max(8, Math.round(ph * ANIMAL_DENSITY_SCALE)));
   let topTex: THREE.CanvasTexture | null = null;
   let bottomTex: THREE.CanvasTexture | null = null;
   const cache = new Map<number, THREE.CanvasTexture>();
@@ -549,12 +534,6 @@ export function build27Pack(
   const yawDegrees = (direction: number) => direction <= 8 ? direction * 22.5 : (direction - 16) * 22.5;
   return {
     asymmetric,
-    renderView(tier, direction, width, height, turn, profile) {
-      const polar = tier >= CREATURE_PITCHES.length;
-      const pitch = polar ? (tier === CREATURE_PITCHES.length ? 88 : -88) : CREATURE_PITCHES[tier];
-      const sculpture = turn && profile ? bendAnimal(evalFn, ex, ey, profile, turn) : evalFn;
-      return raymarchCreatureView(width, height, ex, ey, yawDegrees(direction), pitch, polar, pal, sculpture, shadeFn);
-    },
     getTop() {
       if (!topTex) topTex = raymarchCreatureView(bw, bh, ex, ey, 0, 88, true, pal, evalFn, shadeFn);
       return topTex;
@@ -613,10 +592,10 @@ export function pick27View(
   angleState?: AnimalViewAngles,
   dt = 0,
   cameraChanged = false,
-): { tex: THREE.CanvasTexture | null; flipX: boolean; isPolar: boolean; view: SpriteView } {
+): { tex: THREE.CanvasTexture | null; flipX: boolean; isPolar: boolean } {
   const selected = (angleState ?? new AnimalViewAngles()).select(upDot, fwdDot, leftDot);
-  if (selected.pole > 0) return { tex: pack.getTop(), flipX: false, isPolar: true, view: { tier: 9, direction: 0 } };
-  if (selected.pole < 0) return { tex: pack.getBottom(), flipX: false, isPolar: true, view: { tier: 10, direction: 0 } };
+  if (selected.pole > 0) return { tex: pack.getTop(), flipX: false, isPolar: true };
+  if (selected.pole < 0) return { tex: pack.getBottom(), flipX: false, isPolar: true };
   let planned = angleState?.plan(selected, dt, cameraChanged) ?? selected;
   const spriteDirection = (view: typeof planned) =>
     pack.asymmetric && view.mirrored && view.direction > 0 && view.direction < 8 ? 16 - view.direction : view.direction;
@@ -635,7 +614,7 @@ export function pick27View(
   if (tex && (angleState?.current || (actual.tier === planned.tier && actual.direction === planned.direction))) {
     angleState?.commit({ ...actual, mirrored: pack.asymmetric ? resolved.direction > 8 : planned.mirrored });
   }
-  return { tex, flipX: !pack.asymmetric && actual.direction > 0 && actual.direction < 8 && planned.mirrored, isPolar: false, view: resolved };
+  return { tex, flipX: !pack.asymmetric && actual.direction > 0 && actual.direction < 8 && planned.mirrored, isPolar: false };
 }
 
 // ============================================================================
@@ -1339,7 +1318,7 @@ const REAL_WORLD_HEIGHT_M: Record<string, number> = {
  */
 const SPRITE_PADDING_FACTOR = 1.45;
 
-export function getRealWorldScale(name: string, origH: number, className = ''): number {
+function getRealWorldScale(name: string, origH: number, className = ''): number {
   const clean = (s: string) =>
     s.toLowerCase().replace(/(billboard|animal|entity|mesh)$/i, '').replace(/[^a-z]/g, '');
   const targetH = REAL_WORLD_HEIGHT_M[clean(name)] ?? REAL_WORLD_HEIGHT_M[clean(className)];
@@ -1365,7 +1344,6 @@ export abstract class BasePixelAnimal implements AnimalEntity {
   protected readonly geometry = new THREE.PlaneGeometry(1, 1);
   protected readonly uFlashColor = { value: new THREE.Color(0xff3030) };
   protected readonly uFlashAmount = { value: 0 };
-  private readonly rasterOutline = { value: 0 };
   protected readonly mapUniform: { value: THREE.CanvasTexture };
   protected readonly pixelSizeUniform = { value: 3.0 };
   protected readonly gridOriginUniform = { value: new THREE.Vector2(0, 0) };
@@ -1385,6 +1363,8 @@ export abstract class BasePixelAnimal implements AnimalEntity {
   private renderedFacing?: number;
   private groundMotor?: CharacterMotor;
   private readonly motionAnimation = new AnimalMotionAnimation();
+  private turnSmooth = 0;
+  private readonly turnQuat = new THREE.Quaternion();
   protected flash = 0;
   protected bodyPitch = 0;
 
@@ -1408,8 +1388,6 @@ export abstract class BasePixelAnimal implements AnimalEntity {
   protected readonly worldW: number;
   protected readonly worldH: number;
   private readonly origWorldH: number;
-  private readonly spriteResolution: ReturnType<typeof actorSpriteResolution>;
-  private readonly texelSize = new THREE.Vector2();
 
   constructor(
     protected readonly ctx: GameContext,
@@ -1424,16 +1402,15 @@ export abstract class BasePixelAnimal implements AnimalEntity {
     this.origWorldH = worldH;
     this.worldW = worldW * realScale;
     this.worldH = worldH * realScale;
-    this.spriteResolution = actorSpriteResolution(this.worldW, this.worldH);
-    this.texelSize.set(1 / initialTex.image.width, 1 / initialTex.image.height);
     this.root.name = name;
     this.mapUniform = { value: initialTex };
     this.materialShader = new THREE.ShaderMaterial({
-      defines: { RASTER_OUTLINE: 1 },
       uniforms: {
-        uRasterOutline: this.rasterOutline,
         uMap: this.mapUniform,
-        uTexelSize: { value: this.texelSize },
+        uTexelSize: { value: new THREE.Vector2(
+          1 / Math.min(96, Math.max(8, Math.round(pw * ANIMAL_DENSITY_SCALE))),
+          1 / Math.min(96, Math.max(8, Math.round(ph * ANIMAL_DENSITY_SCALE))),
+        ) },
         uPixelSize: this.pixelSizeUniform,
         uGridOrigin: this.gridOriginUniform,
         uFlashColor: this.uFlashColor,
@@ -1505,7 +1482,6 @@ export abstract class BasePixelAnimal implements AnimalEntity {
     this.hasTex = true;
     if (this.mapUniform.value !== tex) {
       this.mapUniform.value = tex;
-      this.texelSize.set(1 / tex.image.width, 1 / tex.image.height);
       const hadMap = !!this.depthMaterial.map;
       this.depthMaterial.map = tex;
       if (!hadMap) this.depthMaterial.needsUpdate = true;
@@ -1517,7 +1493,6 @@ export abstract class BasePixelAnimal implements AnimalEntity {
     centerY: number,
     camera: THREE.Camera,
     drawingBufferSize?: THREE.Vector2,
-    raster?: (view: SpriteView, turn?: AnimalTurnPose) => THREE.CanvasTexture,
   ) {
     if (this.ctx.tuning.freezeBillboards) return;
     const motor = this.groundMotor;
@@ -1572,7 +1547,7 @@ export abstract class BasePixelAnimal implements AnimalEntity {
     const leftDot = this.toCam.dot(this.left);
 
     // O worker cuida das vistas distantes também; distância não pode prender um sprite frontal.
-    const { tex, flipX, isPolar, view } = pick27View(
+    const { tex, flipX, isPolar } = pick27View(
       pack, upDot, fwdDot, leftDot, true, this.hasTex, this.viewAngles, this.ctx.clock.dt, cameraChanged,
     );
     this.renderedFacing = turn.yaw + this.viewAngles.yawLag;
@@ -1584,39 +1559,38 @@ export abstract class BasePixelAnimal implements AnimalEntity {
       this.yAxis.copy(this.camUp);
     }
 
+    // Animação procedural de giro lateral: inclinação corporal (bank) + passo de pivô suave ao virar
+    this.turnSmooth = damp(this.turnSmooth, turn.velocity / turn.maxSpeed, 12, this.ctx.clock.dt);
+    const turnMag = Math.abs(this.turnSmooth);
+    const turnBank = (fwdDot >= 0 ? -1 : 1) * this.turnSmooth * 0.16;
+    const turnBob = Math.abs(Math.sin(turn.pivotPhase)) * turnMag * this.worldH * 0.038;
+    const turnSquashX = 1 - turnMag * 0.05;
+    const turnStretchY = 1 + turnMag * 0.03;
+
     this.zAxis.copy(this.camBack);
     this.xAxis.crossVectors(this.yAxis, this.zAxis).normalize();
     this.basisMat.makeBasis(this.xAxis, this.yAxis, this.zAxis);
     this.mesh.quaternion.setFromRotationMatrix(this.basisMat);
-    this.mesh.position.set(this.position.x, centerY, this.position.z).addScaledVector(this.camBack, 0.02);
-    const p = actorScreenPixelSize(bufH);
-    const depth = Math.max(.5, this.tmp.subVectors(this.mesh.position, this.camPos).dot(this.camFwd));
-    const pixelsPerMeter = bufH / (2 * depth * tanHalfFov);
-    this.ndc.copy(this.mesh.position).project(camera);
-    const visible = Math.abs(this.ndc.x) < 1 + this.worldW * pixelsPerMeter / bufW
-      && Math.abs(this.ndc.y) < 1 + this.worldH * pixelsPerMeter / bufH && Math.abs(this.ndc.z) <= 1;
-    const rows = this.worldH * pixelsPerMeter / p;
-    const pose = visible && !isPolar && this.alive && this.flash < .35
-      ? quantizeTurnPose(turn.headYaw, turn.pivotPhase) : undefined;
-    let groundTexture = tex ?? this.mapUniform.value;
-    if (raster && visible) {
-      this.rasterOutline.value = 1;
-      this.setTex(raster(view, pose));
-    } else if (tex) {
-      this.rasterOutline.value = 0;
-      const normal = visible ? getAnimalDensityTexture(pack, tex, this.spriteResolution, rows, isPolar ? Math.sign(upDot) : 0) : tex;
-      const turning = pose && getAnimalTurnTexture(pack, normal.image, rows, pose, flipX);
-      groundTexture = turning ?? normal;
-      this.setTex(groundTexture);
+    if (turnMag > 0.005 && !isPolar) {
+      this.turnQuat.setFromAxisAngle(this.zAxis, turnBank);
+      this.mesh.quaternion.premultiply(this.turnQuat);
     }
-    this.mesh.scale.set(flipX ? -this.worldW : this.worldW, this.worldH, 1);
+    this.mesh.position.set(this.position.x, centerY + turnBob, this.position.z).addScaledVector(this.camBack, 0.02);
+    if (tex) {
+      this.setTex(tex);
+    }
+    this.mesh.scale.set(
+      (flipX ? -this.worldW : this.worldW) * turnSquashX,
+      this.worldH * turnStretchY,
+      1,
+    );
     const supportY = this.groundMotor?.groundY ?? this.ctx.physics.groundHeight(
       this.position.x, this.position.z, this.position.y, 0,
     ).y;
     const groundY = Number.isFinite(supportY) ? supportY : 0;
     const onGround = this.groundMotor ? this.groundMotor.grounded : Number.isFinite(supportY);
     const groundLift = onGround
-      ? keepAnimalAboveGround(this.mesh, groundTexture, groundY)
+      ? keepAnimalAboveGround(this.mesh, this.mapUniform.value, groundY)
       : 0;
 
     // Atualiza o plano de sombra virado para o Sol usando o sprite da pose atual visto pelo ângulo do Sol
@@ -1634,6 +1608,11 @@ export abstract class BasePixelAnimal implements AnimalEntity {
     this.contactShadow.scale.set(this.baseContactRx * 2 * airFade, 1, this.baseContactRz * 2 * airFade);
     (this.contactShadow.material as THREE.MeshBasicMaterial).opacity = airFade;
 
+    const partDepth = Math.max(0.5, this.tmp.subVectors(this.mesh.position, this.camPos).dot(this.camFwd));
+    // Usa a mesma densidade de pixel do herói (HERO_PPU = 56) para que todos os animais
+    // tenham exatamente o mesmo tamanho de pixel na tela que o humano (sem mixels).
+    const ppu = 56;
+    const p = Math.max(1, Math.round(bufH / (2 * partDepth * tanHalfFov * ppu)));
     this.pixelSizeUniform.value = p;
     this.ndc.copy(this.mesh.position).project(camera);
     const sxScreen = (this.ndc.x * 0.5 + 0.5) * bufW;

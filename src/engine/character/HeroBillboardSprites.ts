@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { createCustomHeroOverrides } from './CustomHeroSprites';
-import { ACTOR_PIXELS_PER_METER } from './ActorPixelGrid';
 
 /**
  * High-Detail Realistic 3D SDF Sculpted & Raymarched Sprites for the Hero (`HERO_PPU = 56`).
@@ -27,8 +26,7 @@ import { ACTOR_PIXELS_PER_METER } from './ActorPixelGrid';
  */
 
 /** Uniform texels per world meter across every hero billboard part (56 PPU). */
-// Escala original da arte do herói e dos equipamentos. A grade de tela é compartilhada.
-export const HERO_PPU = ACTOR_PIXELS_PER_METER;
+export const HERO_PPU = 56;
 
 export interface BillboardPartMeta {
   /** World-space width in meters (`pixelWidth / HERO_PPU`). */
@@ -767,14 +765,16 @@ export function createHeroSpriteSet(): HeroSpriteSet {
   });
 
   const headLevel = bakeHeadTier(0);
-  const directions = {
-    front: custom.headFront, frontSide: custom.headFrontSide, side: custom.headSide,
-    backSide: custom.headBackSide, back: custom.headBack,
-  };
-  for (const [key, texture] of Object.entries(directions) as [keyof EightWayTier, THREE.CanvasTexture][]) {
-    headLevel[key].dispose();
-    headLevel[key] = reg(texture);
-  }
+  headLevel.front.dispose();
+  headLevel.front = reg(custom.headFront);
+  headLevel.frontSide.dispose();
+  headLevel.frontSide = reg(custom.headFrontSide);
+  headLevel.side.dispose();
+  headLevel.side = reg(custom.headSide);
+  headLevel.backSide.dispose();
+  headLevel.backSide = reg(custom.headBackSide);
+  headLevel.back.dispose();
+  headLevel.back = reg(custom.headBack);
   const headMidHigh = bakeHeadTier(24);
   const headHigh = bakeHeadTier(48);
   const headMidLow = bakeHeadTier(-24);
@@ -796,22 +796,19 @@ export function createHeroSpriteSet(): HeroSpriteSet {
     meta: makeMeta(26, 26, 0.5, 0.22),
   };
 
-  const bakeTorso = (yaw: number, pitch: number, pole = false) => reg(raymarchHeroPart(
-    26, 33, .232, .295, yaw, pitch, pole, evalHeroTorso, shadeHeroTorso,
-  ));
   const torso: BillboardPartTextures<CoreTextures> = {
     textures: {
       front: reg(custom.torsoFront),
-      frontSide: bakeTorso(45, 4),
-      side: bakeTorso(90, 4),
-      backSide: bakeTorso(135, 4),
-      back: bakeTorso(180, 4),
-      highFront: bakeTorso(0, 46),
-      highSide: bakeTorso(90, 46),
-      highBack: bakeTorso(180, 46),
-      top: bakeTorso(0, 86, true),
+      frontSide: reg(raymarchHeroPart(26, 33, 0.232, 0.295, 45, 4, false, evalHeroTorso, shadeHeroTorso)),
+      side: reg(raymarchHeroPart(26, 33, 0.232, 0.295, 90, 4, false, evalHeroTorso, shadeHeroTorso)),
+      backSide: reg(raymarchHeroPart(26, 33, 0.232, 0.295, 135, 4, false, evalHeroTorso, shadeHeroTorso)),
+      back: reg(raymarchHeroPart(26, 33, 0.232, 0.295, 180, 4, false, evalHeroTorso, shadeHeroTorso)),
+      highFront: reg(raymarchHeroPart(26, 33, 0.232, 0.295, 0, 46, false, evalHeroTorso, shadeHeroTorso)),
+      highSide: reg(raymarchHeroPart(26, 33, 0.232, 0.295, 90, 46, false, evalHeroTorso, shadeHeroTorso)),
+      highBack: reg(raymarchHeroPart(26, 33, 0.232, 0.295, 180, 46, false, evalHeroTorso, shadeHeroTorso)),
+      top: reg(raymarchHeroPart(26, 33, 0.232, 0.295, 0, 86, true, evalHeroTorso, shadeHeroTorso)),
     },
-    meta: makeMeta(26, 33, .5, .46),
+    meta: makeMeta(26, 33, 0.5, 0.46),
   };
 
   const pelvis: BillboardPartTextures<CoreTextures> = {

@@ -22,11 +22,7 @@ export function initAnimalSpriteWorkers() {
     if (failed) return;
     for (const slot of slots) {
       if (slot.job) continue;
-      // Reservar o segundo worker para vistas e poses de gameplay enquanto
-      // uma textura maior é calculada.
-      const detailRunning = slots.some(other => other.job?.recipe.resolution);
-      const next = ahead.findIndex(job => !job.recipe.resolution || !detailRunning);
-      const job = urgent.shift() ?? (next < 0 ? undefined : ahead.splice(next, 1)[0]);
+      const job = urgent.shift() ?? ahead.shift();
       if (!job) break;
       slot.job = job;
       slot.worker.postMessage({ id: job.id, recipe: job.recipe, view: job.view });

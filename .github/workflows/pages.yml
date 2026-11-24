@@ -38,9 +38,3 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
-      - name: Mostrar link do jogo no resumo
-        env:
-          GAME_URL: ${{ steps.deployment.outputs.page_url }}
-        run: |
-          printf '### Jogo publicado\n\n[▶ Jogar PixelIsland Combat online](%s)\n\n%s\n' "$GAME_URL" "$GAME_URL" >> "$GITHUB_STEP_SUMMARY"
-          printf 'Jogar online: %s\n' "$GAME_URL"

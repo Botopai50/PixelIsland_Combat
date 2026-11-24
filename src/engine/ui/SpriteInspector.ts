@@ -1,14 +1,7 @@
 import { PILLBUG_IDLE, PILLBUG_WALK, PILLBUG_CURL, PILLBUG_W, PILLBUG_H, PILLBUG_PW, PILLBUG_PH, getPillBugPosePack, type PillBugPose } from '../enemies/PillBug';
 import * as THREE from 'three';
-import { ACTOR_PIXELS_PER_METER, actorScreenPixelSize, actorSpriteResolution } from '../character/ActorPixelGrid';
-import { getAnimalDensityTexture, getAnimalTurnTexture, getReadyAnimalSprite, getResolvedAnimalView, requestAnimalSprite, type SpriteView } from '../enemies/AnimalSpriteCache';
-import { previewAnimalTurn } from '../enemies/AnimalTurnPose';
 import { HERO_STYLE, HumanoidRig } from '../character/HumanoidRig';
 import { SkeletalBillboard, type HeroBodyPartKey } from '../character/SkeletalBillboard';
-import {
-  buildTravelerPosePack, getTravelerPosePack, TRAVELER_CENTER, TRAVELER_IDLE, TRAVELER_IDLE_FPS,
-  TRAVELER_PX, TRAVELER_SIZE, TRAVELER_TALK, TRAVELER_TALK_FPS, type TravelerPose,
-} from '../npc/TravelerSprites';
 import {
   buildAntlerWardenPosePack, getAntlerWardenPosePack, WARDEN_CENTER, WARDEN_IDLE, WARDEN_PH, WARDEN_PW,
   WARDEN_SIZE, WARDEN_STOMP, WARDEN_STONES, WARDEN_SWEEP, WARDEN_WALK, type WardenPose,
@@ -17,6 +10,7 @@ import {
   buildThornUrsaPosePack, getThornUrsaPosePack, URSA_CENTER, URSA_CHARGE, URSA_IDLE, URSA_PH, URSA_PW,
   URSA_ROOTS, URSA_SIZE, URSA_SLAM, URSA_WALK, type UrsaPose,
 } from '../enemies/ThornUrsaSprites';
+import { buildTravelerPosePack, getTravelerPosePack, TRAVELER_CENTER, TRAVELER_IDLE, TRAVELER_PH, TRAVELER_PW, TRAVELER_SIZE, TRAVELER_TALK, type TravelerPose } from '../enemies/TravelerSprites';
 import type { EightWayTier } from '../character/HeroBillboardSprites';
 import {
   BOAR_H, BOAR_PH, BOAR_PPU, BOAR_PW, BOAR_W,
@@ -25,7 +19,7 @@ import {
 import {
   ANIMAL_PPU,
   CHICKEN_H, CHICKEN_PH, CHICKEN_PW, CHICKEN_W, getChickenPosePack, type ChickenPoseName,
-  CREATURE_FRAGMENT_SHADER, CREATURE_PITCHES, CREATURE_VERTEX_SHADER, CREATURE_YAWS, getRealWorldScale,
+  CREATURE_FRAGMENT_SHADER, CREATURE_PITCHES, CREATURE_VERTEX_SHADER, CREATURE_YAWS,
   FISH_SPECIES_META, getFishPosePack, type FishPoseName, type FishSpecies,
   RABBIT_H, RABBIT_PH, RABBIT_PW, RABBIT_W, getRabbitPosePack, type RabbitPoseName,
   pick27View,
@@ -176,7 +170,6 @@ interface SpriteEntry {
   w: number;
   h: number;
   dataUrl: string;
-  creatureView?: SpriteView;
 }
 
 type EntityKey =
@@ -404,6 +397,16 @@ function makeFishCreature(key: 'fish' | 'clown' | 'koi' | 'puffer' | 'angelfish'
 }
 
 const CREATURES: Record<Exclude<EntityKey, 'hero'>, CreatureConfig> = {
+  traveler: defineCreature<TravelerPose>({
+    key: 'traveler', label: 'Bento, o viajante',
+    pw: TRAVELER_PW, ph: TRAVELER_PH, ppu: ANIMAL_PPU, worldW: TRAVELER_SIZE, worldH: TRAVELER_SIZE,
+    centerY: TRAVELER_CENTER, camDist: 3.4, getPack: getTravelerPosePack, getSheetPack: buildTravelerPosePack,
+    anims: [
+      { id: 'c_idle', label: '▶ Parado', frames: [...TRAVELER_IDLE], fps: 2.6, isCycle: true },
+      { id: 'c_talk', label: '▶ Conversando', frames: [...TRAVELER_TALK], fps: 4.2, isCycle: true },
+    ],
+    poses: [...TRAVELER_IDLE, ...TRAVELER_TALK],
+  }),
   antler_warden: defineCreature<WardenPose>({
     key: 'antler_warden', label: 'Guardião Galhudo',
     pw: WARDEN_PW, ph: WARDEN_PH, ppu: ANIMAL_PPU, worldW: WARDEN_SIZE, worldH: WARDEN_SIZE,
@@ -844,17 +847,6 @@ const CREATURES: Record<Exclude<EntityKey, 'hero'>, CreatureConfig> = {
       'peck0', 'peck1', 'peck2',
       'flap0', 'flap1', 'flap2', 'flap3', 'flap4', 'flap5',
     ],
-  }),
-  traveler: defineCreature<TravelerPose>({
-    key: 'traveler', label: 'Bento, o viajante',
-    pw: TRAVELER_PX, ph: TRAVELER_PX, ppu: TRAVELER_PX / TRAVELER_SIZE,
-    worldW: TRAVELER_SIZE, worldH: TRAVELER_SIZE, centerY: TRAVELER_CENTER, camDist: 3.65,
-    getPack: getTravelerPosePack, getSheetPack: buildTravelerPosePack,
-    anims: [
-      { id: 'c_idle', label: '▶ Parado', frames: [...TRAVELER_IDLE], fps: TRAVELER_IDLE_FPS, isCycle: true },
-      { id: 'c_talk', label: '▶ Conversando', frames: [...TRAVELER_TALK], fps: TRAVELER_TALK_FPS, isCycle: true },
-    ],
-    poses: [...TRAVELER_IDLE, ...TRAVELER_TALK],
   }),
   pill_bug: defineCreature<PillBugPose>({
     key: 'pill_bug', label: 'Tatuzinho-de-jardim',
@@ -2253,33 +2245,25 @@ function buildHeroCatalog(bb: SkeletalBillboard): SpriteEntry[] {
     add({
       codeName: l.code, part: l.part, partLabel: l.label, jointLabel: l.joint,
       angleLabel: 'Todos os ângulos (rotaciona 2D no osso)', pitchLabel: 'Qualquer', yawLabel: 'Qualquer',
-      condition: 'Billboard axial alinhado ao osso',
-      mirrorNote: 'Espelhado conforme o lado',
+      condition: 'Billboard axial alinhado ao osso (espelhado E/D)', mirrorNote: 'Mesmo sprite nos dois lados',
       camYawDeg: l.yawDeg, camPitchDeg: 6, targetY: l.targetY, camDist: 2.55, w: l.w, h: l.h,
     }, l.tex);
   }
   return list;
 }
 
-function creatureWorldResolution(cfg: CreatureConfig) {
-  const scale = getRealWorldScale(cfg.key, cfg.worldH);
-  return actorSpriteResolution(cfg.worldW * scale, cfg.worldH * scale);
-}
-
 function buildCreatureCatalog(cfg: CreatureConfig, poseKey: string): SpriteEntry[] {
   const pack = (cfg.getSheetPack ?? cfg.getPack)(poseKey);
   const list: SpriteEntry[] = [];
   const prefix = `${cfg.key.toUpperCase()}_${poseKey.toUpperCase()}`;
-  const native = creatureWorldResolution(cfg);
 
-  const add = (code: string, angleLabel: string, pitchDeg: number, yawDeg: number, cond: string, tex: THREE.CanvasTexture, view: SpriteView, mirror?: string) => {
+  const add = (code: string, angleLabel: string, pitchDeg: number, yawDeg: number, cond: string, tex: THREE.CanvasTexture, mirror?: string) => {
     list.push({
       id: `${cfg.key}_${poseKey}_${code}`,
-      creatureView: view,
       codeName: `${prefix}_${code}`,
       part: 'creature',
       partLabel: `${cfg.label} · ${poseKey}`,
-      jointLabel: `${ACTOR_PIXELS_PER_METER} px/m · ${native.width}×${native.height} px na escala do jogo`,
+      jointLabel: `${tex.image.width}×${tex.image.height} px`,
       angleLabel,
       pitchLabel: `${pitchDeg >= 0 ? '+' : ''}${pitchDeg}°`,
       yawLabel: `${yawDeg}°`,
@@ -2295,7 +2279,7 @@ function buildCreatureCatalog(cfg: CreatureConfig, poseKey: string): SpriteEntry
     });
   };
 
-  if (!pack.asymmetric) add('TOP', 'Topo (+88°)', 88, 0, 'Vista polar', pack.getTop(), { tier: CREATURE_PITCHES.length, direction: 0 });
+  if (!pack.asymmetric) add('TOP', 'Topo (+88°)', 88, 0, 'Vista polar', pack.getTop());
 
   const tiers: { idx: number; code: string; label: string; cond: string }[] = [
     { idx: 0, code: 'P80',   label: 'Bem alto (+80°)',   cond: 'pitch ≈ +80° (9 alturas · passo 20°)' },
@@ -2323,13 +2307,12 @@ function buildCreatureCatalog(cfg: CreatureConfig, poseKey: string): SpriteEntry
         yaw,
         `${t.cond} · 16 direções (passo 22.5°)`,
         pack.getView(t.idx, d)!,
-        { tier: t.idx, direction: d },
         mirror,
       );
     }
   }
 
-  if (!pack.asymmetric) add('BOTTOM', 'Por baixo (-88°)', -88, 0, 'Vista polar', pack.getBottom(), { tier: CREATURE_PITCHES.length + 1, direction: 0 });
+  if (!pack.asymmetric) add('BOTTOM', 'Por baixo (-88°)', -88, 0, 'Vista polar', pack.getBottom());
   return list;
 }
 
@@ -2351,7 +2334,6 @@ export class SpriteInspector {
 
   private heroEntries: SpriteEntry[] = [];
   private activeEntries: SpriteEntry[] = [];
-  private spriteDetailTimer = 0;
   private cardEls = new Map<string, HTMLButtonElement>();
   private hovered: SpriteEntry | null = null;
   private locked: SpriteEntry | null = null;
@@ -2497,9 +2479,7 @@ export class SpriteInspector {
     const hlChk = this.root.querySelector('.si-hl-chk') as HTMLInputElement;
     hlChk.addEventListener('change', () => {
       this.highlightEnabled = hlChk.checked;
-      if (!this.highlightEnabled) {
-        this.billboard.setHighlightPart(null);
-      }
+      if (!this.highlightEnabled) this.billboard.setHighlightPart(null);
     });
 
     this.root.querySelector('.si-btn-reset')!.addEventListener('click', () => {
@@ -2534,7 +2514,6 @@ export class SpriteInspector {
   }
 
   close() {
-    window.clearTimeout(this.spriteDetailTimer);
     if (!this.open) return;
     this.open = false;
     this.root.classList.add('hidden');
@@ -2657,18 +2636,17 @@ export class SpriteInspector {
       b.classList.toggle('active', ENTITY_TABS[idx].key === key);
     });
 
-    const isHero = key === 'hero';
-    this.billboard.setVisible(isHero);
-    this.heroAnim = 'idle';
-    this.creatureMesh.visible = !isHero;
-    this.hlWrapEl.style.display = isHero ? '' : 'none';
+    const isHumanoid = key === 'hero';
+    this.billboard.setVisible(isHumanoid);
+    this.creatureMesh.visible = !isHumanoid;
+    this.hlWrapEl.style.display = isHumanoid ? '' : 'none';
 
-    if (isHero) {
+    if (isHumanoid) {
       this.activeEntries = this.heroEntries;
       this.renderHeroAnimBar();
       this.renderHeroFilters();
       this.renderHeroSheet();
-      const def = this.activeEntries.find((e) => e.codeName === 'HEAD_FRONT') ?? this.activeEntries[0];
+      const def = this.heroEntries.find((e) => e.codeName === 'HEAD_FRONT') ?? this.heroEntries[0];
       this.hovered = def;
       this.focusEntry(def, true);
     } else {
@@ -2724,17 +2702,16 @@ export class SpriteInspector {
   private renderCreatureAnimBar(cfg: CreatureConfig) {
     this.animBarEl.innerHTML = '<span class="si-bar-label">Animação:</span>';
     const turnAnims: CreatureAnimDef[] = [
-      { id: '__turn_left', label: '↺ Virar Esq.', frames: cfg.anims[0].frames, fps: 7, isCycle: true },
-      { id: '__turn_right', label: '↻ Virar Dir.', frames: cfg.anims[0].frames, fps: 7, isCycle: true },
+      { id: '__turn_left', label: '↺ Virar Esq.', frames: cfg.anims[1]?.frames ?? cfg.anims[0].frames, fps: 7, isCycle: true },
+      { id: '__turn_right', label: '↻ Virar Dir.', frames: cfg.anims[1]?.frames ?? cfg.anims[0].frames, fps: 7, isCycle: true },
     ];
-    for (const a of cfg.key === 'traveler' ? cfg.anims : [...cfg.anims, ...turnAnims]) {
+    for (const a of [...cfg.anims, ...turnAnims]) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `si-anim-btn${a.id === this.creatureAnimId ? ' active' : ''}`;
       btn.textContent = a.label;
       btn.addEventListener('click', () => {
         this.creatureAnimId = a.id;
-        this.clockT = 0;
         this.creaturePose = a.frames[0];
         this.animBarEl.querySelectorAll('.si-anim-btn').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
@@ -2779,14 +2756,12 @@ export class SpriteInspector {
       this.syncCreaturePoseButtons(cfg);
     }
     this.activeEntries = buildCreatureCatalog(cfg, this.creaturePose);
-    this.locked = this.locked && this.activeEntries.find(entry => entry.id === this.locked?.id) || null;
-    this.hudLockEl.classList.toggle('hidden', !this.locked);
     this.renderCreatureSheet(cfg);
     // Mantém o ângulo aproximado ou foca 3/4 frente
     const prefix = `${cfg.key.toUpperCase()}_${this.creaturePose.toUpperCase()}`;
     const def = this.activeEntries.find((e) => e.codeName === `${prefix}_LEVEL_D2`) ?? this.activeEntries[0];
     this.hovered = def;
-    this.focusEntry(this.locked ?? def, instantCamera);
+    this.focusEntry(def, instantCamera);
   }
 
   private addSheetSection(
@@ -2898,10 +2873,8 @@ export class SpriteInspector {
       ], byCode);
     }
     if (this.heroFilter === 'all' || this.heroFilter === 'limbs') {
-      const armor = byCode.has('PAULDRON');
-      const apron = byCode.has('TRAVELER_APRON');
-      this.addSheetSection('Membros e extremidades', ['Braço Sup.', 'Antebraço', 'Mão', 'Coxa', armor ? 'Ombreira' : '', ...(apron ? ['Avental'] : [])], [
-        { label: 'Qualquer', cells: ['UPPER_ARM', 'FOREARM', 'HAND', 'THIGH', armor ? 'PAULDRON' : null, ...(apron ? ['TRAVELER_APRON'] : [])] },
+      this.addSheetSection('Membros & Extremidades (4 sprites)', ['Braço Sup.', 'Antebraço', 'Mão', 'Coxa', ''], [
+        { label: 'Qualquer', cells: ['UPPER_ARM', 'FOREARM', 'HAND', 'THIGH', null] },
       ], byCode);
     }
     this.syncCardStates();
@@ -2968,35 +2941,12 @@ export class SpriteInspector {
 
     this.infoThumbEl.src = entry.dataUrl;
     this.infoNameEl.textContent = `${entry.codeName} (${entry.w}×${entry.h} px)`;
-    this.loadSpriteDetail(entry);
     this.infoPartEl.textContent = `${entry.partLabel} · ${entry.jointLabel}`;
     this.infoAngleEl.textContent = `Ângulo: ${entry.angleLabel}${entry.mirrorNote ? ` — ${entry.mirrorNote}` : ''}`;
     this.infoCondEl.textContent = `Regra: ${entry.condition}`;
     this.hudPartEl.textContent = `${entry.partLabel}`;
 
     this.syncCardStates();
-  }
-
-  private loadSpriteDetail(entry: SpriteEntry) {
-    window.clearTimeout(this.spriteDetailTimer);
-    if (this.entity === 'hero' || !entry.creatureView) return;
-    const cfg = CREATURES[this.entity];
-    const native = creatureWorldResolution(cfg);
-    if (entry.w === native.width && entry.h === native.height) return;
-    this.infoNameEl.textContent = `${entry.codeName} (prévia ${entry.w}×${entry.h} px)`;
-    const pack = cfg.getPack(this.creaturePose);
-    const view = entry.creatureView;
-    this.spriteDetailTimer = window.setTimeout(async () => {
-      const texture = await requestAnimalSprite(pack, view, native);
-      if (!texture || (this.locked ?? this.hovered) !== entry || !this.open) return;
-      entry.dataUrl = texToDataUrl(texture);
-      entry.w = texture.image.width;
-      entry.h = texture.image.height;
-      this.infoThumbEl.src = entry.dataUrl;
-      this.infoNameEl.textContent = `${entry.codeName} (${entry.w}×${entry.h} px)`;
-      const thumbnail = this.cardEls.get(entry.id)?.querySelector('img');
-      if (thumbnail) thumbnail.src = entry.dataUrl;
-    }, 150);
   }
 
   private bindStageOrbit() {
@@ -3025,11 +2975,11 @@ export class SpriteInspector {
     }, { passive: false });
   }
 
-  private animateHeroPreview(t: number, rig: HumanoidRig) {
-    const j = rig.joints;
+  private animateHeroPreview(t: number) {
+    const j = this.rig.joints;
     // Reset base
-    rig.body.position.set(0, rig.bodyPivotY, 0);
-    rig.body.rotation.set(0, 0, 0);
+    this.rig.body.position.set(0, this.rig.bodyPivotY, 0);
+    this.rig.body.rotation.set(0, 0, 0);
     j.spine.rotation.set(0, 0, 0);
     j.chest.rotation.set(0, 0, 0);
     j.head.rotation.set(0, 0, 0);
@@ -3044,13 +2994,13 @@ export class SpriteInspector {
 
     if (this.heroAnim === 'idle') {
       const b = Math.sin(t * 2.2) * 0.012;
-      rig.body.position.y = rig.bodyPivotY + b;
+      this.rig.body.position.y = this.rig.bodyPivotY + b;
     } else if (this.heroAnim === 'walk' || this.heroAnim === 'run') {
       const isRun = this.heroAnim === 'run';
       const w = t * (isRun ? 10.5 : 6.2);
       const amp = isRun ? 0.85 : 0.48;
       const s = Math.sin(w);
-      rig.body.position.y = rig.bodyPivotY + Math.abs(Math.cos(w)) * (isRun ? 0.065 : 0.03);
+      this.rig.body.position.y = this.rig.bodyPivotY + Math.abs(Math.cos(w)) * (isRun ? 0.065 : 0.03);
       j.spine.rotation.x = isRun ? 0.22 : 0.08;
       j.thighL.rotation.x = s * amp;
       j.thighR.rotation.x = -s * amp;
@@ -3063,7 +3013,7 @@ export class SpriteInspector {
     } else if (this.heroAnim === 'jump') {
       const p = (t * 1.4) % 1;
       const arc = Math.sin(p * Math.PI);
-      rig.body.position.y = rig.bodyPivotY + arc * 0.45;
+      this.rig.body.position.y = this.rig.bodyPivotY + arc * 0.45;
       j.thighL.rotation.x = -0.55 * arc;
       j.thighR.rotation.x = -0.30 * arc;
       j.shinL.rotation.x = 0.85 * arc;
@@ -3078,8 +3028,9 @@ export class SpriteInspector {
     const isTurnRight = this.creatureAnimId === '__turn_right';
     const isTurning = isTurnLeft || isTurnRight;
     const turnDir = isTurnLeft ? 1 : isTurnRight ? -1 : 0;
-    const turning = isTurning ? previewAnimalTurn(this.clockT, turnDir) : undefined;
-    const anim = cfg.anims.find((a) => a.id === this.creatureAnimId);
+    const anim = isTurning
+      ? (cfg.anims[1] ?? cfg.anims[0])
+      : cfg.anims.find((a) => a.id === this.creatureAnimId);
     let poseKey = this.creaturePose;
     let yOff = 0;
 
@@ -3088,6 +3039,9 @@ export class SpriteInspector {
       poseKey = anim.frames[idx];
       if (anim.bobAmp) yOff += Math.abs(Math.sin(this.clockT * anim.fps * Math.PI * 0.5)) * anim.bobAmp;
       if (anim.hopAmp) yOff += Math.sin((this.clockT * 2.2) % Math.PI) * anim.hopAmp;
+    }
+    if (isTurning) {
+      yOff += Math.abs(Math.sin(this.clockT * 7.5)) * cfg.worldH * 0.04;
     }
 
     const pack = cfg.getPack(poseKey);
@@ -3100,7 +3054,7 @@ export class SpriteInspector {
 
     this.toCam.set(this.camPos.x, this.camPos.y - cy, this.camPos.z).normalize();
     const upDot = this.toCam.y;
-    const turnYaw = turning?.yaw ?? 0;
+    const turnYaw = isTurning ? turnDir * this.clockT * 2.1 : 0;
     const cosY = Math.cos(turnYaw);
     const sinY = Math.sin(turnYaw);
     const fwdDot = this.toCam.x * sinY + this.toCam.z * cosY;
@@ -3119,39 +3073,25 @@ export class SpriteInspector {
     this.xAxis.crossVectors(this.yAxis, this.zAxis).normalize();
     this.basisMat.makeBasis(this.xAxis, this.yAxis, this.zAxis);
     this.creatureMesh.quaternion.setFromRotationMatrix(this.basisMat);
+    if (isTurning && !isPolar) {
+      const bank = (fwdDot >= 0 ? -1 : 1) * turnDir * 0.16;
+      this.creatureMesh.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(this.zAxis, bank));
+    }
     this.creatureMesh.position.set(0, cy, 0);
+    if (tex) {
+      const sx = isTurning ? 0.95 : 1;
+      const sy = isTurning ? 1.03 : 1;
+      this.creatureMesh.scale.set((flipX ? -cfg.worldW : cfg.worldW) * sx, cfg.worldH * sy, 1);
+      this.creatureMapU.value = tex;
+    }
+    this.creatureTexelU.value.set(1 / cfg.pw, 1 / cfg.ph);
+
     const bufW = this.bufSize.x || 640;
     const bufH = this.bufSize.y || 480;
-    const p = actorScreenPixelSize(bufH);
-    if (tex) {
-      const resolution = creatureWorldResolution(cfg);
-      const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) * .5);
-      const depth = Math.max(.5, this.tmp.subVectors(this.creatureMesh.position, this.camPos).dot(this.camFwd));
-      const visibleRows = bufH * cfg.worldH / (2 * depth * tanHalfFov * p);
-      const view = isPolar
-        ? { tier: CREATURE_PITCHES.length + Number(upDot < 0), direction: 0 }
-        : getResolvedAnimalView(pack);
-      const selected = !this.creatureAnimId && view ? getReadyAnimalSprite(pack, view, resolution) : undefined;
-      const normal = selected ?? getAnimalDensityTexture(pack, tex, resolution, visibleRows, isPolar ? Math.sign(upDot) : 0);
-      const turnTexture = turning?.pose && !isPolar
-        ? getAnimalTurnTexture(pack, normal.image, visibleRows, turning.pose, flipX) : undefined;
-      const sample = this.renderer.domElement.dataset;
-      if (turning) {
-        sample.turnAngle = String(Math.round(turnYaw * 180 / Math.PI));
-        sample.turnPose = turnTexture ? 'articulated' : 'neutral';
-      } else if (sample.turnAngle !== undefined) {
-        delete sample.turnAngle;
-        delete sample.turnPose;
-      }
-      const displayed = turnTexture ?? normal;
-      this.creatureMesh.scale.set(flipX ? -cfg.worldW : cfg.worldW, cfg.worldH, 1);
-      if (this.creatureMapU.value !== displayed) {
-        this.renderer.domElement.dataset.spriteResolution = `${displayed.image.width}×${displayed.image.height}`;
-      }
-      this.creatureMapU.value = displayed;
-      this.creatureTexelU.value.set(1 / displayed.image.width, 1 / displayed.image.height);
-    }
-
+    const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) * 0.5);
+    const partDepth = Math.max(0.5, this.tmp.subVectors(this.creatureMesh.position, this.camPos).dot(this.camFwd));
+    const ppu = cfg.ph / cfg.worldH;
+    const p = Math.max(1.5, bufH / (2 * partDepth * tanHalfFov * ppu));
     this.creaturePixelSizeU.value = p;
     this.ndc.copy(this.creatureMesh.position).project(this.camera);
     const sx = (this.ndc.x * 0.5 + 0.5) * bufW;
@@ -3195,7 +3135,7 @@ export class SpriteInspector {
 
     if (!this.freezePlanes) {
       if (this.entity === 'hero') {
-        this.animateHeroPreview(this.clockT, this.rig);
+        this.animateHeroPreview(this.clockT);
         const active = this.locked ?? this.hovered;
         if (this.highlightEnabled && active && active.part !== 'creature') {
           const pulse = 0.42 + 0.28 * (0.5 + 0.5 * Math.sin(this.clockT * 5.5));
