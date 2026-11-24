@@ -22,6 +22,8 @@ npm run preview    # serve o build (http://localhost:4173)
 ```
 
 O build grava os quadros dos animais, monstros e Bento em `sprites/<espécie>/`.
+Ele reaproveita os atlas de `docs/` ou do build anterior e gera apenas os grupos cujos
+arquivos de origem mudaram ou cujos atlas estão faltando.
 O jogo carrega sob demanda os atlas compactados para a altura da câmera.
 
 Para testar no celular: rode `npm run dev` e abra, no celular (mesma rede Wi-Fi), o endereço

@@ -1,20 +1,16 @@
-import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { availableParallelism } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Worker, isMainThread, workerData } from 'node:worker_threads';
 import { gzipSync } from 'node:zlib';
-import { ANIMAL_SPRITE_POSES } from '../src/engine/enemies/AnimalSpritePoses.ts';
-import {
-  ANIMAL_ATLAS_HEADER_BYTES, ANIMAL_ATLAS_TOP, ANIMAL_ATLAS_BOTTOM, ASYMMETRIC_ATLAS_FACTORIES,
-  FISH_ATLAS_SPECIES, animalAtlasDirectionCount, animalAtlasFolder,
-} from '../src/engine/enemies/AnimalSpriteAtlasLayout.ts';
+import { ANIMAL_ATLAS_HEADER_BYTES, ANIMAL_ATLAS_TOP, animalAtlasDirectionCount } from '../src/engine/enemies/AnimalSpriteAtlasLayout.ts';
+import { animalBakeInputs, atlasFiles, familyCacheEntry, readFamilyAtlases } from './sprite-bake-inputs.mjs';
 
-async function bakeFamily({ bundle, root, module, factory, poses, variant, folder }) {
+async function bakeFamily({ bundle, root, module, factory, poses, variant, folder, asymmetric }) {
   let complete;
   globalThis.self = { postMessage: message => complete(message) };
   await import(bundle);
-  const asymmetric = ASYMMETRIC_ATLAS_FACTORIES.has(factory);
   const directory = join(root, folder);
   await mkdir(directory, { recursive: true });
   async function render(pose, tier, direction) {
@@ -27,8 +23,7 @@ async function bakeFamily({ bundle, root, module, factory, poses, variant, folde
     return result.pixels;
   }
 
-  for (let tier = 0; tier <= ANIMAL_ATLAS_BOTTOM; tier++) {
-    const filename = `${tier}.rgba.gz`;
+  for (const [tier, filename] of atlasFiles.entries()) {
     const directions = animalAtlasDirectionCount(tier, asymmetric);
     if (tier >= ANIMAL_ATLAS_TOP) {
       const frames = [];
@@ -63,41 +58,73 @@ async function bakeFamily({ bundle, root, module, factory, poses, variant, folde
   }
 }
 
-async function bake() {
-  const output = resolve(process.argv[2] ?? 'dist');
+async function readManifest(root) {
+  try {
+    return JSON.parse(await readFile(join(root, 'manifest.json'), 'utf8')) ?? {};
+  } catch (error) {
+    if (error.code === 'ENOENT' || error instanceof SyntaxError) return {};
+    throw error;
+  }
+}
+
+async function reuseFamily(family, sources) {
+  for (const { root, manifest } of sources) {
+    const entry = manifest[family.folder];
+    if (entry?.fingerprint !== family.fingerprint || entry.files?.length !== atlasFiles.length) continue;
+    try {
+      const atlases = await readFamilyAtlases(root, family.folder);
+      const actual = familyCacheEntry(family, atlases);
+      if (actual.files.every((hash, index) => hash === entry.files[index])) return { atlases, entry: actual };
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+  return null;
+}
+
+export async function bake(output, sourceRoots) {
   const assets = join(output, 'assets');
   const workerFiles = (await readdir(assets)).filter(name => /^AnimalSpriteWorker-.*\.js$/.test(name));
   if (workerFiles.length !== 1) throw new Error(`Expected one sprite worker in ${assets}`);
   const bundle = pathToFileURL(join(assets, workerFiles[0])).href;
   const root = join(output, 'sprites');
-  const families = Object.entries(ANIMAL_SPRITE_POSES).flatMap(([key, poses]) => {
-    const [module, factory] = key.split(':');
-    const variants = factory === 'getFishPosePack' ? FISH_ATLAS_SPECIES.map(species => [species]) : [[]];
-    return variants.map(variant => ({
-      module, factory, poses, variant, folder: animalAtlasFolder(module, factory, variant), bundle, root,
-    }));
-  });
+  const families = await animalBakeInputs();
   if (new Set(families.map(family => family.folder)).size !== families.length) {
     throw new Error('Duplicate sprite atlas folders');
   }
+  const sources = await Promise.all([...new Set(sourceRoots)].map(async root => ({ root, manifest: await readManifest(root) })));
+  const entries = new Map();
   const workers = Math.min(8, Math.max(1, availableParallelism() - 1));
   let nextFamily = 0;
   let completed = 0;
-  await Promise.all(Array.from({ length: workers }, async () => {
+  let reused = 0;
+  const results = await Promise.allSettled(Array.from({ length: workers }, async () => {
     while (nextFamily < families.length) {
       const family = families[nextFamily++];
-      await new Promise((done, fail) => {
-        const worker = new Worker(new URL(import.meta.url), { workerData: family });
-        worker.on('error', fail);
-        worker.on('exit', code => code === 0 ? done() : fail(new Error(`Sprite baker exited with code ${code}`)));
-      });
-      completed++;
-      if (completed % 10 === 0 || completed === families.length) {
-        console.log(`Sprites: ${completed}/${families.length} species`);
+      const cached = await reuseFamily(family, sources);
+      if (cached) {
+        const directory = join(root, family.folder);
+        await mkdir(directory, { recursive: true });
+        await Promise.all(atlasFiles.map((file, index) => writeFile(join(directory, file), cached.atlases[index])));
+        entries.set(family.folder, cached.entry);
+        reused++;
+      } else {
+        await new Promise((done, fail) => {
+          const worker = new Worker(new URL(import.meta.url), { workerData: { ...family, bundle, root } });
+          worker.on('error', fail);
+          worker.on('exit', code => code === 0 ? done() : fail(new Error(`Sprite baker exited with code ${code}`)));
+        });
+        entries.set(family.folder, familyCacheEntry(family, await readFamilyAtlases(root, family.folder)));
       }
+      completed++;
+      if (completed % 20 === 0 && reused !== completed) console.log(`Sprites: ${completed}/${families.length} prontos`);
     }
   }));
+  const failed = results.find(result => result.status === 'rejected');
+  if (failed) throw failed.reason;
+  const manifest = Object.fromEntries(families.map(({ folder }) => [folder, entries.get(folder)]));
+  await writeFile(join(root, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+  console.log(`Sprites: ${reused} grupos reaproveitados, ${families.length - reused} gerados`);
 }
 
-if (isMainThread) await bake();
-else await bakeFamily(workerData);
+if (!isMainThread) await bakeFamily(workerData);
