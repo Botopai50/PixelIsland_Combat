@@ -456,7 +456,7 @@ export class PlayerView {
   renderFullBody(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, buffer: THREE.Vector2) {
     const enabled = !this.hidden && this.ctx.tuning.fullBodyHero;
     if (enabled && !this.fullBody) {
-      this.fullBody = new FullBodyHeroSprite(this.billboard, this.gearBillboards);
+      this.fullBody = new FullBodyHeroSprite(this.billboard, this.gearBillboards, this.rig);
       this.ctx.scene.add(this.fullBody.mesh);
     }
     this.fullBody?.setEnabled(enabled, this.ctx.scene);

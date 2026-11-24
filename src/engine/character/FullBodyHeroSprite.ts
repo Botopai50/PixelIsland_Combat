@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { EquipmentBillboards } from '../items/EquipmentBillboards';
 import type { SkeletalBillboard } from './SkeletalBillboard';
+import type { HumanoidRig } from './HumanoidRig';
+import { HeroSculpture } from './HeroSculpture';
 
 const vertexShader = /* glsl */ `
 uniform vec2 uBuffer;
@@ -23,8 +25,23 @@ uniform float uExtent;
 void main() {
   vec2 pixel = (floor((gl_FragCoord.xy - uOrigin) / uCell) + 0.5) * (uCell / uExtent);
   vec4 color = texture2D(uColor, pixel);
-  if (color.a < 0.5) discard;
-  gl_FragDepth = texture2D(uDepth, pixel).r;
+  float depth = texture2D(uDepth, pixel).r;
+  if (color.a < 0.5) {
+    // Build the outline after depth has united the sculpture and equipment.
+    float texel = uCell / uExtent;
+    depth = 1.0;
+    for (int i = 0; i < 4; i++) {
+      vec2 direction = i == 0 ? vec2(1,0) : i == 1 ? vec2(-1,0) : i == 2 ? vec2(0,1) : vec2(0,-1);
+      vec2 neighbor = pixel + direction * texel;
+      vec4 sampleColor = texture2D(uColor, neighbor);
+      if (sampleColor.a > 0.5 && dot(sampleColor.rgb, vec3(.3,.59,.11)) > .025) {
+        depth = min(depth, texture2D(uDepth, neighbor).r);
+      }
+    }
+    if (depth >= 1.0) discard;
+    color = vec4(.011, .007, .008, 1.0);
+  }
+  gl_FragDepth = depth;
   gl_FragColor = color;
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -59,12 +76,16 @@ export class FullBodyHeroSprite {
     vertexShader,
     fragmentShader,
   });
+  private readonly sculpture: HeroSculpture;
   readonly mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.material);
 
   constructor(
     private readonly body: SkeletalBillboard,
     private readonly equipment: EquipmentBillboards,
+    rig: HumanoidRig,
   ) {
+    this.sculpture = new HeroSculpture(rig);
+    this.scene.add(this.sculpture.root);
     this.camera.matrixAutoUpdate = false;
     this.mesh.name = 'HeroFullBodySprite';
     this.mesh.frustumCulled = false;
@@ -73,8 +94,14 @@ export class FullBodyHeroSprite {
 
   setEnabled(enabled: boolean, world: THREE.Scene) {
     const destination = enabled ? this.scene : world;
-    if (this.body.root.parent !== destination) destination.add(this.body.root, this.equipment.root);
-    if (!enabled) this.mesh.visible = false;
+    if (this.equipment.root.parent === destination) return;
+    destination.add(this.equipment.root);
+    if (enabled) {
+      this.body.root.removeFromParent();
+    } else {
+      world.add(this.body.root);
+      this.mesh.visible = false;
+    }
   }
 
   update(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, buffer: THREE.Vector2, feet: THREE.Vector3) {
@@ -102,8 +129,8 @@ export class FullBodyHeroSprite {
     this.material.uniforms.uCell.value = cell;
     this.material.uniforms.uExtent.value = extent;
 
-    // Capture the authored sprites on exactly the same screen grid as the
-    // segmented renderer, preserving their original texels and depth order.
+    // Render the sculpture and equipment into a single depth-tested sprite
+    // on the same screen grid as the rest of the scene.
     this.camera.matrix.copy(camera.matrixWorld);
     this.camera.updateMatrixWorld(true);
     this.crop.set(
@@ -123,6 +150,7 @@ export class FullBodyHeroSprite {
     this.previousOffset.copy(pixelOffsetUniform.value);
     bufferSizeUniform.value.set(resolution, resolution);
     pixelOffsetUniform.value.multiply(buffer).multiplyScalar(1 / extent);
+    this.sculpture.update(camera, pixelOffsetUniform.value);
     pixelSizeUniform.value = 1;
     renderer.setRenderTarget(this.target);
     renderer.setClearColor(0, 0);
