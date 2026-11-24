@@ -11,12 +11,21 @@ export type WardenPose = typeof WARDEN_IDLE[number] | typeof WARDEN_WALK[number]
 
 export const WARDEN_PW = 65, WARDEN_PH = 65;
 export const WARDEN_SIZE = 9.5, WARDEN_CENTER = 3.46;
-const SIZE = WARDEN_SIZE * .25;
+export const WARDEN_SDF_EXTENT = WARDEN_SIZE * .25;
 
 type Point = [number, number, number];
-type Shape = { min: Point; max: Point; material: string; distance: (x: number, y: number, z: number) => number };
+interface Shape {
+  min: Point;
+  max: Point;
+  material: string;
+  distance: (x: number, y: number, z: number) => number;
+  kind: 0 | 1 | 2;
+  a: Point;
+  b: Point;
+  style: Point;
+}
 
-const tones = {
+export const wardenTones = {
   bark: [[47, 39, 43], [91, 69, 62], [142, 110, 91]],
   splinter: [[71, 56, 54], [129, 98, 78], [181, 146, 113]],
   rock: [[49, 43, 49], [78, 67, 68], [122, 99, 87]],
@@ -26,18 +35,20 @@ const tones = {
   moss: [[45, 49, 40], [93, 92, 56], [132, 127, 78]],
   cloth: [[59, 36, 42], [101, 48, 47], [154, 66, 53]],
 } satisfies Record<string, [Point, Point, Point]>;
-const palette: Record<string, Point> = {
+export const wardenPalette: Record<string, Point> = {
   k: [24, 22, 29], eye: [221, 172, 75], cavity: [24, 21, 28],
 };
-for (const [name, shades] of Object.entries(tones)) {
-  shades.forEach((rgb, i) => { palette[name + i] = rgb; });
+for (const [name, shades] of Object.entries(wardenTones)) {
+  shades.forEach((rgb, i) => { wardenPalette[name + i] = rgb; });
 }
 
 const raw = new Map<WardenPose, ReturnType<typeof build27Pack>>();
 const registered = new Map<WardenPose, ReturnType<typeof build27Pack>>();
 
-export function buildAntlerWardenPosePack(pose: WardenPose) {
-  const cached = raw.get(pose);
+const sculptures = new Map<WardenPose, Shape[]>();
+
+export function getAntlerWardenSculpture(pose: WardenPose) {
+  const cached = sculptures.get(pose);
   if (cached) return cached;
   const frame = Number(pose.at(-1));
   const walking = pose.startsWith('walk');
@@ -62,6 +73,7 @@ export function buildAntlerWardenPosePack(pose: WardenPose) {
 
   function oval([cx, cy, cz]: Point, [rx, ry, rz]: Point, material: string) {
     shapes.push({
+      kind: 0, a: [cx, cy, cz], b: [rx, ry, rz], style: [0, 0, 0],
       min: [cx - rx, cy - ry, cz - rz], max: [cx + rx, cy + ry, cz + rz], material,
       distance: (x, y, z) => sdEllipsoid(x, y, z, cx, cy, cz, rx, ry, rz),
     });
@@ -70,6 +82,7 @@ export function buildAntlerWardenPosePack(pose: WardenPose) {
   function branch(a: Point, b: Point, ra: number, rb: number, material: string) {
     const r = Math.max(ra, rb);
     shapes.push({
+      kind: 1, a, b, style: [ra, rb, 0],
       min: [Math.min(a[0], b[0]) - r, Math.min(a[1], b[1]) - r, Math.min(a[2], b[2]) - r],
       max: [Math.max(a[0], b[0]) + r, Math.max(a[1], b[1]) + r, Math.max(a[2], b[2]) + r],
       material, distance: (x, y, z) => sdCapsule(x, y, z, ...a, ...b, ra, rb),
@@ -86,8 +99,9 @@ export function buildAntlerWardenPosePack(pose: WardenPose) {
     const ux = sideways > .001 ? ty / sideways : 1;
     const uy = sideways > .001 ? -tx / sideways : 0;
     const vx = -tz * uy, vy = tz * ux, vz = tx * uy - ty * ux;
-    const bound = Math.max(start, end) * 1.15;
+    const bound = Math.max(start, end) * 1.15 + .024;
     shapes.push({
+      kind: 2, a, b, style: [start, end, thickness],
       min: [Math.min(a[0], b[0]) - bound, Math.min(a[1], b[1]) - bound, Math.min(a[2], b[2]) - bound],
       max: [Math.max(a[0], b[0]) + bound, Math.max(a[1], b[1]) + bound, Math.max(a[2], b[2]) + bound],
       material,
@@ -244,6 +258,14 @@ export function buildAntlerWardenPosePack(pose: WardenPose) {
     facet(a, head([side * .299, 1.181, .512]), .074, .025, 'horn');
   }
 
+  sculptures.set(pose, shapes);
+  return shapes;
+}
+
+export function buildAntlerWardenPosePack(pose: WardenPose) {
+  const cached = raw.get(pose);
+  if (cached) return cached;
+  const shapes = getAntlerWardenSculpture(pose);
   const evaluate: SdfEvaluator = (x, y, z) => {
     let d = Infinity;
     let mat = 'k';
@@ -256,8 +278,8 @@ export function buildAntlerWardenPosePack(pose: WardenPose) {
     }
     return { d, mat };
   };
-  const pack = build27Pack(WARDEN_PW, WARDEN_PH, SIZE, SIZE, palette, evaluate, (mat, shade, x, y, z) => {
-    if (!(mat in tones)) return mat;
+  const pack = build27Pack(WARDEN_PW, WARDEN_PH, WARDEN_SDF_EXTENT, WARDEN_SDF_EXTENT, wardenPalette, evaluate, (mat, shade, x, y, z) => {
+    if (!(mat in wardenTones)) return mat;
     const band = Math.floor(x * 10 + y * 7) * 11 + Math.floor(z * 11 - y * 12) * 5;
     const light = shade + Math.sin(band) * (mat === 'bone' ? .028 : .066);
     return mat + (light > .75 ? '2' : light > .435 ? '1' : '0');
