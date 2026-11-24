@@ -17,6 +17,8 @@ export class TestArena {
   dummy: TrainingDummy;
   readonly spawnPoint = new THREE.Vector3(0, 0, -13);
   readonly playerStart = new THREE.Vector3(0, 0, 4);
+  readonly pondCenter = new THREE.Vector3(-4.5, 0, 14.2);
+  readonly pondRadius = 3.5;
   private spawnRing: THREE.Mesh;
   private t = 0;
 
@@ -27,7 +29,7 @@ export class TestArena {
 
     // ---------------------------------------------------------------- chão
     const size = 64;
-    const groundGeo = new THREE.PlaneGeometry(size, size, 48, 48);
+    const groundGeo = new THREE.PlaneGeometry(size, size, 24, 24);
     groundGeo.rotateX(-Math.PI / 2);
     const colors: number[] = [];
     const c = new THREE.Color();
@@ -107,7 +109,39 @@ export class TestArena {
     this.rock = new MineableRock(ctx, pickups, new THREE.Vector3(6, 0, 7));
     this.dummy = new TrainingDummy(ctx, new THREE.Vector3(0, 0, 10), Math.PI);
 
+    // ---------------------------------------------------------------- lago dos peixes
+    const sandBank = new THREE.Mesh(
+      new THREE.CylinderGeometry(this.pondRadius + 0.55, this.pondRadius + 0.85, 0.06, 28),
+      new THREE.MeshStandardMaterial({ color: 0xd9c28a, roughness: 1, flatShading: true }),
+    );
+    sandBank.position.set(this.pondCenter.x, 0.025, this.pondCenter.z);
+    sandBank.receiveShadow = true;
+    scene.add(sandBank);
+
+    const water = new THREE.Mesh(
+      new THREE.CylinderGeometry(this.pondRadius, this.pondRadius, 0.08, 28),
+      new THREE.MeshStandardMaterial({
+        color: 0x2da8c4,
+        roughness: 0.25,
+        metalness: 0.1,
+        transparent: true,
+        opacity: 0.78,
+        flatShading: true,
+      }),
+    );
+    water.position.set(this.pondCenter.x, 0.055, this.pondCenter.z);
+    water.receiveShadow = true;
+    scene.add(water);
+
+    const lilyMat = new THREE.MeshStandardMaterial({ color: 0x4ca64c, roughness: 0.85, flatShading: true });
+    for (const [ox, oz, rad] of [[-1.9, -1.2, 0.42], [2.1, 0.9, 0.36], [-0.8, 2.2, 0.34]] as const) {
+      const padMesh = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, 0.025, 10), lilyMat);
+      padMesh.position.set(this.pondCenter.x + ox, 0.105, this.pondCenter.z + oz);
+      scene.add(padMesh);
+    }
+
     // placas
+    this.label('Lago dos peixes', new THREE.Vector3(this.pondCenter.x, 1.9, this.pondCenter.z));
     this.label('Árvore — use o MACHADO', new THREE.Vector3(-7, 5.4, 8));
     this.label('Pedra — use a PICARETA', new THREE.Vector3(6, 2.4, 7));
     this.label('Boneco de treino (capacete de metal)', new THREE.Vector3(0, 2.7, 10));
@@ -192,7 +226,7 @@ export class TestArena {
     sun.position.set(-14, 24, 10);
     sun.castShadow = true;
     const mobile = matchMedia('(pointer: coarse)').matches;
-    sun.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048);
+    sun.shadow.mapSize.set(mobile ? 512 : 1024, mobile ? 512 : 1024);
     const s = sun.shadow.camera;
     s.left = -30; s.right = 30; s.top = 30; s.bottom = -30; s.near = 1; s.far = 80;
     sun.shadow.bias = -0.0004;
@@ -252,36 +286,49 @@ export class TestArena {
   }
 
   private buildScenery(scene: THREE.Scene) {
-    // montanhas distantes e árvores decorativas fora da arena (escala e horizonte)
+    // montanhas distantes e árvores decorativas fora da arena (instanciadas para reduzir draw calls)
     const mMat = new THREE.MeshStandardMaterial({ color: 0x7d8fa0, roughness: 1, flatShading: true });
     const snow = new THREE.MeshStandardMaterial({ color: 0xf2f4f8, roughness: 1, flatShading: true });
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2 + rand(-0.1, 0.1);
+    const mntCount = 14;
+    const mntGeo = new THREE.ConeGeometry(1, 1, 6);
+    const mntInst = new THREE.InstancedMesh(mntGeo, mMat, mntCount);
+    const capInst = new THREE.InstancedMesh(mntGeo, snow, mntCount);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const pos = new THREE.Vector3();
+    const scl = new THREE.Vector3();
+    for (let i = 0; i < mntCount; i++) {
+      const a = (i / mntCount) * Math.PI * 2 + rand(-0.1, 0.1);
       const d = rand(90, 130);
       const h = rand(25, 55);
-      const mnt = new THREE.Mesh(new THREE.ConeGeometry(rand(18, 30), h, 6), mMat);
-      mnt.position.set(Math.cos(a) * d, h / 2 - 2, Math.sin(a) * d);
-      scene.add(mnt);
-      const cap = new THREE.Mesh(new THREE.ConeGeometry(6, h * 0.25, 6), snow);
-      cap.position.set(mnt.position.x, h - 2 - h * 0.125 - 0.5, mnt.position.z);
-      cap.scale.setScalar(1);
-      scene.add(cap);
+      const r = rand(18, 30);
+      const mx = Math.cos(a) * d, mz = Math.sin(a) * d;
+      m.compose(pos.set(mx, h / 2 - 2, mz), q, scl.set(r, h, r));
+      mntInst.setMatrixAt(i, m);
+      m.compose(pos.set(mx, h - 2 - h * 0.125 - 0.5, mz), q, scl.set(6, h * 0.25, 6));
+      capInst.setMatrixAt(i, m);
     }
+    scene.add(mntInst, capInst);
+
     const leaf = new THREE.MeshStandardMaterial({ color: 0x3f7a33, roughness: 1, flatShading: true });
     const trunk = new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1, flatShading: true });
-    for (let i = 0; i < 40; i++) {
+    const treeCount = 40;
+    const trunkInst = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.25, 0.35, 2, 5), trunk, treeCount);
+    const leafInst = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 6), leaf, treeCount);
+    for (let i = 0; i < treeCount; i++) {
       const a = rand(0, Math.PI * 2);
       const d = rand(30, 55);
-      const g = new THREE.Group();
-      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 2, 5), trunk);
-      t.position.y = 1;
-      const c = new THREE.Mesh(new THREE.ConeGeometry(rand(1.5, 2.4), rand(4, 6), 6), leaf);
-      c.position.y = 4;
-      g.add(t, c);
-      g.position.set(Math.cos(a) * d, 0, Math.sin(a) * d);
-      g.scale.setScalar(rand(0.8, 1.5));
-      scene.add(g);
+      const s = rand(0.8, 1.5);
+      const cr = rand(1.5, 2.4);
+      const ch = rand(4, 6);
+      const tx = Math.cos(a) * d, tz = Math.sin(a) * d;
+      m.compose(pos.set(tx, 1 * s, tz), q, scl.set(s, s, s));
+      trunkInst.setMatrixAt(i, m);
+      m.compose(pos.set(tx, 4 * s, tz), q, scl.set(cr * s, ch * s, cr * s));
+      leafInst.setMatrixAt(i, m);
     }
+    scene.add(trunkInst, leafInst);
+
     // chão externo
     const outer = new THREE.Mesh(new THREE.CircleGeometry(200, 32), new THREE.MeshStandardMaterial({ color: 0x6d9a4a, roughness: 1 }));
     outer.rotation.x = -Math.PI / 2;

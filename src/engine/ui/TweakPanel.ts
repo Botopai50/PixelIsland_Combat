@@ -31,6 +31,8 @@ export class TweakPanel {
       'Salvar no navegador': () => saveTuning(this.t),
       'Copiar JSON': () => navigator.clipboard?.writeText(JSON.stringify(this.t, null, 2)),
     };
+    gui.addFolder('Personagem').add(t, 'fullBodyHero').name('Sprite de corpo inteiro');
+
     const fp = gui.addFolder('Presets e comparação');
     for (const [k, fn] of Object.entries(presets)) fp.add({ [k]: fn }, k);
     for (const [k, fn] of Object.entries(actions)) fp.add({ [k]: fn }, k);
@@ -119,6 +121,8 @@ export class TweakPanel {
     au.add(t, 'volume', 0, 1.5, 0.05).name('Volume');
     au.add(t, 'timeScale', { '1× normal': 1, '0.5×': 0.5, '0.25×': 0.25, '0.1× (quadro a quadro)': 0.1 }).name('Câmera lenta');
     au.add(t, 'showHitboxes').name('Mostrar hitboxes');
+    au.add(t, 'freezeBillboards').name('Travar planos (ver de lado)');
+    au.add(t, 'peacefulAnimals').name('Animais pacíficos');
 
     gui.onChange(() => saveTuning(this.t));
     gui.close();

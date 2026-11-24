@@ -14,9 +14,10 @@ export const CONTROLS_DESKTOP: [string, string][] = [
   ['T', 'Trocar ombro da câmera'],
   ['1–6 / roda', 'Barra rápida (equipar)'],
   ['Tab / I', 'Inventário'],
+  ['E', 'Conversar com Bento quando estiver perto'],
   ['G', 'Gerar inimigo'],
   ['R', 'Restaurar arena'],
-  ['P', 'Painel de ajustes'],
+  ['P', 'Ajustes · Personagem: sprite de corpo inteiro'],
   ['B', 'Comparar: juice ligado/desligado'],
   ['H', 'Ajuda'],
 ];

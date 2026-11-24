@@ -9,6 +9,8 @@ import type { PhysicsWorld, SurfaceMaterial } from './PhysicsWorld';
 export class CharacterMotor {
   position = new THREE.Vector3();
   velocity = new THREE.Vector3();
+  /** Velocidade realmente percorrida depois de resolver as colisões. */
+  horizontalSpeed = 0;
   radius = 0.38;
   height = 1.75;
   stepUp = 0.36;
@@ -24,19 +26,24 @@ export class CharacterMotor {
   wallNormal = new THREE.Vector3();
   /** Deslocamento visual para suavizar degraus (o corpo "sobe" em vez de teleportar). */
   visualStepOffset = 0;
+  /** Coordenação opcional da locomoção antes de integrar e resolver colisões. */
+  beforeMove?: (dt: number) => void;
 
   constructor(public world: PhysicsWorld) {}
 
   teleport(p: THREE.Vector3) {
     this.position.copy(p);
     this.velocity.set(0, 0, 0);
+    this.horizontalSpeed = 0;
     this.visualStepOffset = 0;
   }
 
   update(dt: number) {
     this.landedThisFrame = false;
     this.hitWall = false;
-    if (dt <= 0) return;
+    if (dt <= 0) { this.horizontalSpeed = 0; return; }
+    this.beforeMove?.(dt);
+    const startX = this.position.x, startZ = this.position.z;
 
     // --- horizontal com sub-passos para não atravessar paredes finas
     const hx = this.velocity.x * dt, hz = this.velocity.z * dt;
@@ -57,6 +64,8 @@ export class CharacterMotor {
         this.velocity.z -= this.wallNormal.z * vn;
       }
     }
+
+    this.horizontalSpeed = Math.hypot(this.position.x - startX, this.position.z - startZ) / dt;
 
     // --- vertical
     const prevY = this.position.y;

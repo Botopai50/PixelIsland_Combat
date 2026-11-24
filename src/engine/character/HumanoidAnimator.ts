@@ -235,6 +235,10 @@ export class HumanoidAnimator {
     P.head.x = -P.spine.x * 0.78;
     // cabeça compensa o giro do tronco (olhar estável, apontando à frente)
     P.head.y = sn * 0.06 * W - P.chest.y * 0.8 * R;
+    if (this.rig.style.variant === 'hero') {
+      // The pelvis and spine also pass their yaw down to the head.
+      P.head.y = -(P.pelvis.y + P.spine.y + P.chest.y);
+    }
 
     // --- braços (andar: pendulares, cotovelo dobra mais quando o braço vai à frente)
     // correr: braços bombeando forte, cotovelos dobrados
@@ -256,7 +260,9 @@ export class HumanoidAnimator {
 
     // ---------------------------------------------------------------- parado (idle)
     const idle = 1 - moving;
-    this.readyW = damp(this.readyW, s.ready ?? 0, 6, dt);
+    const readyTarget = s.ready ?? 0;
+    this.readyW = damp(this.readyW, readyTarget, 6, dt);
+    if (Math.abs(this.readyW - readyTarget) < 0.0001) this.readyW = readyTarget;
     const rdy = this.readyW * idle * (1 - s.guard), rlx = (1 - this.readyW) * idle * (1 - s.guard);
     // em movimento com a arma na mão: o braço ARMADO quase não bombeia — fica
     // baixo, um pouco atrás e afastado do corpo (a arma não fica balançando);

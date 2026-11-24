@@ -165,10 +165,11 @@ export class CameraRig implements AimSource {
     const aiming = p.state === 'bow' ? 1 : 0;
     this.aimBlend = damp(this.aimBlend, aiming, 9, realDt);
 
-    // balanço da corrida (as duas visões; amplitude escolhida mais abaixo)
-    const spd0 = Math.hypot(p.motor.velocity.x, p.motor.velocity.z);
-    this.runSway = damp(this.runSway, p.motor.grounded ? (p.sprinting ? 1 : clamp01(spd0 / 6) * 0.3) : 0, 6, realDt);
-    if (b < 0.5 && p.motor.grounded) this.bobPhase += (spd0 * playerDt) / 1.9;
+    // Keep the third-person view steady during the gait. The first-person
+    // camera still follows the steps, fading in as the view changes.
+    const speed = Math.hypot(p.motor.velocity.x, p.motor.velocity.z);
+    this.runSway = damp(this.runSway, p.motor.grounded ? (p.sprinting ? 1 : clamp01(speed / 6) * 0.3) : 0, 6, realDt);
+    if (p.motor.grounded) this.bobPhase += (speed * playerDt) / 1.9;
 
     // ------------------------------------------------ 3ª pessoa
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
@@ -177,8 +178,6 @@ export class CameraRig implements AimSource {
     const vis = p.motor.visualStepOffset;
     this.pivot.copy(p.position);
     this.pivot.y += T.camHeight + vis + this.landDip.value * 0.03 + J.lift - p.sneakAmount * 0.5;
-    // pisadas da corrida: o pivô sobe/desce um pouco (3ª pessoa)
-    if (T.camBob) this.pivot.y += (Math.abs(Math.sin(this.bobPhase * Math.PI * 2)) - 0.64) * 0.05 * this.runSway * T.camBobAmount * (1 - b);
     const shoulder = lerp(T.camShoulder, Math.max(T.camShoulder, 0.55) * 1.45, this.aimBlend) * this.shoulderBlend;
     const wantDist = lerp(T.camDistance, 2.5, this.aimBlend) * (p.lockTarget ? 1.08 : 1);
     // colisão: primeiro para o lado (ombro), depois para trás
@@ -202,8 +201,6 @@ export class CameraRig implements AimSource {
     if (Number.isFinite(g.y)) thirdPos.y = Math.max(thirdPos.y, g.y + 0.2);
 
     // ------------------------------------------------ 1ª pessoa
-    const speed = Math.hypot(p.motor.velocity.x, p.motor.velocity.z);
-    if (b >= 0.5 && p.motor.grounded) this.bobPhase += (speed * playerDt) / 1.9;
     const bobAmt = T.camBob ? T.camBobAmount * clamp01(speed / 6) : 0;
     const eye = new THREE.Vector3(0, EYE.y, EYE.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), p.facing).add(p.position);
     eye.y -= p.sneakAmount * 0.6;
@@ -255,8 +252,7 @@ export class CameraRig implements AimSource {
     this.leanSm.lerp(lean, 1 - Math.exp(-realDt * 30));
     // 1ª pessoa correndo: a câmera balança (rola de um lado a outro a cada
     // passada e acena a cada pisada); andando, só um resto disso
-    // 3ª pessoa correndo: balanço leve (rola + acena), menor que na 1ª
-    const sw = this.runSway * (T.camBob ? T.camBobAmount : 0) * lerp(0.35, 1, b);
+    const sw = this.runSway * (T.camBob ? T.camBobAmount : 0) * b;
     const ph = this.bobPhase * Math.PI * 2;
     const swRoll = Math.sin(ph) * lerp(0.013, 0.007, b) * sw;
     const swPitch = (Math.abs(Math.cos(ph)) - 0.64) * lerp(0.014, 0.006, b) * sw;

@@ -2,10 +2,13 @@ import * as THREE from 'three';
 import type { GameContext } from '../core/Context';
 import { HumanoidRig, HERO_STYLE, ARM_UPPER, ARM_FORE } from './HumanoidRig';
 import { HumanoidAnimator } from './HumanoidAnimator';
+import { SkeletalBillboard } from './SkeletalBillboard';
+import { FullBodyHeroSprite } from './FullBodyHeroSprite';
 import { solveTwoBoneIK } from './IK';
 import { FootIK } from './FootIK';
 import type { PlayerController } from './PlayerController';
 import { createWeaponModel, BOW_DRAW_LEN, type WeaponModel } from '../items/WeaponModels';
+import { EquipmentBillboards } from '../items/EquipmentBillboards';
 import { ATTACKS, TWO_HAND_GRIP, pivotFor, swingDirLocal } from '../combat/Attacks';
 import { SlashTrail } from '../vfx/Trail';
 import { Spring, clamp01, damp, easeOutBack, yawToDir } from '../core/math';
@@ -36,9 +39,12 @@ export function weaponBasis(dir: THREE.Vector3, edge: THREE.Vector3, out: THREE.
  */
 export class PlayerView {
   readonly rig = new HumanoidRig(HERO_STYLE);
+  readonly billboard: SkeletalBillboard;
+  readonly gearBillboards: EquipmentBillboards;
   readonly animator: HumanoidAnimator;
   readonly trail = new SlashTrail(26);
   private footIK: FootIK;
+  private fullBody?: FullBodyHeroSprite;
   private models = new Map<ItemId, WeaponModel>();
   private shield: WeaponModel;
   private lastMain: ItemId | null = null;
@@ -65,20 +71,44 @@ export class PlayerView {
       ctx.events.emit('footstep', { pos: p.clone(), surface: player.motor.surface, intensity: intensity * (1 - 0.75 * player.sneakAmount), player: true });
     };
     ctx.scene.add(this.rig.root);
+    this.billboard = new SkeletalBillboard(this.rig);
+    ctx.scene.add(this.billboard.root);
+    this.gearBillboards = new EquipmentBillboards(
+      this.billboard.pixelSizeUniform,
+      this.billboard.bufferSizeUniform,
+      this.billboard.pixelOffsetUniform,
+    );
+    ctx.scene.add(this.gearBillboards.root);
     ctx.scene.add(this.trail.mesh);
+    const shadowOnlyMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+    const toShadowOnly = (root: THREE.Object3D) => {
+      root.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh) {
+          m.visible = true;
+          m.castShadow = true;
+          m.receiveShadow = false;
+          m.material = shadowOnlyMat;
+        }
+      });
+    };
     for (const id of ['sword', 'axe', 'pickaxe', 'bow'] as ItemId[]) {
       const m = createWeaponModel(id);
+      toShadowOnly(m.root);
       m.root.visible = false;
       ctx.scene.add(m.root);
       this.models.set(id, m);
     }
     this.shield = createWeaponModel('shield');
+    toShadowOnly(this.shield.root);
     ctx.scene.add(this.shield.root);
     player.stickRoot = this.rig.root;
   }
 
   set visible(v: boolean) {
     this.rig.root.visible = v;
+    this.billboard.setVisible(v);
+    this.gearBillboards.setVisible(v);
     for (const m of this.models.values()) if (!v) m.root.visible = false;
     if (!v) this.shield.root.visible = false;
     this.hidden = !v;
@@ -90,7 +120,7 @@ export class PlayerView {
   private calmT = 0;
   sheathed = false;
 
-  update(dt: number) {
+  update(dt: number, camera: THREE.Camera, drawingBufferSize?: THREE.Vector2) {
     const p = this.player;
     const T = this.ctx.tuning;
     const rig = this.rig;
@@ -379,6 +409,58 @@ export class PlayerView {
       this.trail.push(base, tip);
     }
     this.trail.update(dt, T.trailsEnabled && !this.hidden, a ? 0.6 + a.def.strength * 0.6 : 1);
+
+    // Atualiza billboards esqueléticos e de equipamento após todas as passagens de animação e IK
+    rig.root.updateMatrixWorld(true);
+    if (T.freezeBillboards) return;
+    this.billboard.update(camera, drawingBufferSize);
+    const toolInHands = main === 'axe' || main === 'pickaxe';
+    const weaponOnBack = sheathed && !def && p.state !== 'bow' && p.state !== 'bowRecover';
+    const shieldOnBack = main === 'bow' || sheathed || toolInHands;
+    this.gearBillboards.update(
+      camera,
+      main,
+      model?.root,
+      !!(model && model.root.visible),
+      this.chargeGlow,
+      weaponOnBack,
+      sh.root,
+      sh.root.visible,
+      p.state === 'guardHit' ? 0.3 : 0,
+      shieldOnBack,
+      rig.joints.chest,
+    );
+  }
+
+  /** Re-sincroniza os billboards com a pose atual do rig (ex.: modo rest do RigViewer). */
+  updateBillboards(camera: THREE.Camera, drawingBufferSize?: THREE.Vector2) {
+    this.billboard.update(camera, drawingBufferSize);
+    const main = this.player.mainHand;
+    const model = main ? this.models.get(main) : undefined;
+    const toolInHands = main === 'axe' || main === 'pickaxe';
+    this.gearBillboards.update(
+      camera,
+      main,
+      model?.root,
+      !!(model && model.root.visible),
+      this.chargeGlow,
+      this.sheathed,
+      this.shield.root,
+      this.shield.root.visible,
+      this.player.state === 'guardHit' ? 0.3 : 0,
+      main === 'bow' || this.sheathed || toolInHands,
+      this.rig.joints.chest,
+    );
+  }
+
+  renderFullBody(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, buffer: THREE.Vector2) {
+    const enabled = !this.hidden && this.ctx.tuning.fullBodyHero;
+    if (enabled && !this.fullBody) {
+      this.fullBody = new FullBodyHeroSprite(this.billboard, this.gearBillboards);
+      this.ctx.scene.add(this.fullBody.mesh);
+    }
+    this.fullBody?.setEnabled(enabled, this.ctx.scene);
+    if (enabled) this.fullBody?.update(renderer, camera, buffer, this.rig.root.position);
   }
 
   // ---------------------------------------------------------------- mãos na parede / na borda

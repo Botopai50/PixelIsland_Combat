@@ -55,6 +55,15 @@ export class HUD implements ScreenFX {
   private hitmarkT = 0;
   private v = new THREE.Vector3();
   private lastHp = -1;
+  private lastEquipKey = '';
+  private lastModeText = '';
+  private lastStatsKey = '';
+  private lastStaminaDash = '';
+  private lastBowSpread = -1;
+  private lastFlashOp = '';
+  private lastVigOp = '';
+  private lastTintOp = '';
+  private perfEl: HTMLElement;
   onHotbarClick?: (i: number) => void;
   onHotbarLongPress?: (i: number) => void;
 
@@ -96,6 +105,8 @@ export class HUD implements ScreenFX {
     this.vignetteEl = el('div', 'screen-vignette', root);
     this.tintEl = el('div', 'screen-tint', root);
     this.modeLabel = el('div', 'mode-label', root);
+    this.perfEl = el('div', 'perf-label', root);
+    this.perfEl.style.cssText = 'position:fixed;top:10px;right:12px;font:11px/1.3 monospace;color:#fff6dc;background:rgba(15,18,24,0.6);padding:3px 7px;border-radius:6px;pointer-events:none;z-index:20;';
     this.statsEl = el('div', 'dummy-stats', root);
     el('div', 'keyhints', root, '<kbd>G</kbd> inimigo · <kbd>R</kbd> restaurar · <kbd>V</kbd> 1ª/3ª · <kbd>T</kbd> ombro<br><kbd>Q</kbd> lock-on · <kbd>I</kbd> inventário · <kbd>P</kbd> ajustes · <kbd>B</kbd> juice · <kbd>H</kbd> ajuda');
 
@@ -199,6 +210,10 @@ export class HUD implements ScreenFX {
     return { x: (this.v.x * 0.5 + 0.5) * window.innerWidth, y: (-this.v.y * 0.5 + 0.5) * window.innerHeight, vis };
   }
 
+  setPerf(text: string) {
+    this.perfEl.textContent = text;
+  }
+
   update(realDt: number, camera: THREE.PerspectiveCamera, player: PlayerController, firstPerson: boolean, dummy?: { lastDamage: number; combo: number; dps: number; pos: THREE.Vector3 }) {
     const T = this.ctx.tuning;
     // corações
@@ -216,33 +231,44 @@ export class HUD implements ScreenFX {
 
     // stamina (roda ao lado do personagem, some quando cheia)
     const st = player.stamina / T.staminaMax;
-    const circ = 2 * Math.PI * 17;
-    this.staminaArc.style.strokeDasharray = `${circ * st} ${circ}`;
     const showSt = st < 0.995 || player.sprinting;
     this.staminaWrap.classList.toggle('show', showSt);
     this.staminaWrap.classList.toggle('exhausted', player.exhausted);
-    const anchor = this.project(this.v.copy(player.position).setY(player.position.y + 1.5), camera);
-    // 1ª pessoa: anel fino em volta da mira (onde o olho já está)
-    let sx = anchor.x + 50, sy = anchor.y - 30;
-    if (firstPerson) {
-      sx = window.innerWidth / 2;
-      sy = window.innerHeight / 2;
+    if (showSt) {
+      const circ = 2 * Math.PI * 17;
+      const dash = `${(circ * st).toFixed(1)} ${circ.toFixed(1)}`;
+      if (dash !== this.lastStaminaDash) {
+        this.lastStaminaDash = dash;
+        this.staminaArc.style.strokeDasharray = dash;
+      }
+      const anchor = this.project(this.v.copy(player.position).setY(player.position.y + 1.5), camera);
+      // 1ª pessoa: anel fino em volta da mira (onde o olho já está)
+      let sx = anchor.x + 50, sy = anchor.y - 30;
+      if (firstPerson) {
+        sx = window.innerWidth / 2;
+        sy = window.innerHeight / 2;
+      }
+      this.staminaWrap.classList.toggle('fp', firstPerson);
+      // desliza suave na troca de câmera
+      const k = this.stPos.x < 0 ? 1 : 1 - Math.exp(-realDt * 14);
+      this.stPos.x += (sx - this.stPos.x) * k;
+      this.stPos.y += (sy - this.stPos.y) * k;
+      this.staminaWrap.style.transform = `translate(${this.stPos.x.toFixed(1)}px, ${this.stPos.y.toFixed(1)}px)`;
     }
-    this.staminaWrap.classList.toggle('fp', firstPerson);
-    // desliza suave na troca de câmera
-    const k = this.stPos.x < 0 ? 1 : 1 - Math.exp(-realDt * 14);
-    this.stPos.x += (sx - this.stPos.x) * k;
-    this.stPos.y += (sy - this.stPos.y) * k;
-    this.staminaWrap.style.transform = `translate(${this.stPos.x}px, ${this.stPos.y}px)`;
 
     // mira
     const aiming = player.state === 'bow';
     this.bowRet.classList.toggle('show', aiming);
-    const spread = 26 - player.bowDraw * 20;
-    this.bowRet.style.setProperty('--s', `${spread}px`);
-    this.bowRet.classList.toggle('full', player.bowDraw >= 1);
+    if (aiming) {
+      const spread = Math.round(26 - player.bowDraw * 20);
+      if (spread !== this.lastBowSpread) {
+        this.lastBowSpread = spread;
+        this.bowRet.style.setProperty('--s', `${spread}px`);
+      }
+      this.bowRet.classList.toggle('full', player.bowDraw >= 1);
+    }
     this.crosshair.classList.toggle('show', firstPerson || aiming || player.mainHand === 'bow');
-    this.hitmarkT -= realDt;
+    if (this.hitmarkT > 0) this.hitmarkT -= realDt;
     this.hitmark.classList.toggle('show', this.hitmarkT > 0);
 
     // lock-on
@@ -250,21 +276,33 @@ export class HUD implements ScreenFX {
     if (lt && lt.alive) {
       const c = this.project(lt.center(this.v), camera);
       this.lockRet.classList.toggle('show', c.vis);
-      this.lockRet.style.transform = `translate(${c.x}px, ${c.y}px)`;
+      if (c.vis) this.lockRet.style.transform = `translate(${c.x.toFixed(1)}px, ${c.y.toFixed(1)}px)`;
     } else this.lockRet.classList.remove('show');
 
-    // info de equipamento
-    const main = player.mainHand ? ITEMS[player.mainHand].name : 'Mãos vazias';
-    const off = player.offHand ? ' + Escudo' : '';
+    // info de equipamento (só atualiza DOM quando muda)
     const arrows = player.inventory.count('arrow');
-    const pend = '';
-    this.equipInfo.innerHTML = `<b>${main}</b>${player.mainHand === 'bow' ? '' : off}${pend}<span class="arrows ${arrows === 0 ? 'zero' : ''}">${ITEMS.arrow.icon}<em>${arrows}</em></span>`;
+    const equipKey = `${player.mainHand ?? ''}|${player.offHand ?? ''}|${arrows}`;
+    if (equipKey !== this.lastEquipKey) {
+      this.lastEquipKey = equipKey;
+      const main = player.mainHand ? ITEMS[player.mainHand].name : 'Mãos vazias';
+      const off = player.offHand ? ' + Escudo' : '';
+      this.equipInfo.innerHTML = `<b>${main}</b>${player.mainHand === 'bow' ? '' : off}<span class="arrows ${arrows === 0 ? 'zero' : ''}">${ITEMS.arrow.icon}<em>${arrows}</em></span>`;
+    }
     const gait = player.state === 'climb' ? 'Escalando' : player.state === 'mantle' ? 'Subindo' : player.sneaking ? 'Esgueirando' : player.sprinting ? 'Correndo' : 'Andando';
-    this.modeLabel.textContent = `${firstPerson ? '1ª pessoa' : '3ª pessoa'} · ${gait}`;
+    const modeText = `${firstPerson ? '1ª pessoa' : '3ª pessoa'} · ${gait}`;
+    if (modeText !== this.lastModeText) {
+      this.lastModeText = modeText;
+      this.modeLabel.textContent = modeText;
+    }
 
     // boneco de treino
     if (dummy) {
-      this.statsEl.innerHTML = `<b>Boneco</b> último <em>${dummy.lastDamage}</em> · combo <em>${dummy.combo}</em> · DPS <em>${dummy.dps.toFixed(1)}</em>`;
+      const dpsStr = dummy.dps.toFixed(1);
+      const statsKey = `${dummy.lastDamage}|${dummy.combo}|${dpsStr}`;
+      if (statsKey !== this.lastStatsKey) {
+        this.lastStatsKey = statsKey;
+        this.statsEl.innerHTML = `<b>Boneco</b> último <em>${dummy.lastDamage}</em> · combo <em>${dummy.combo}</em> · DPS <em>${dpsStr}</em>`;
+      }
     }
 
     // popups (números de dano)
@@ -285,13 +323,26 @@ export class HUD implements ScreenFX {
     }
 
     // efeitos de tela
-    this.flashT -= realDt;
-    const fa = Math.max(0, this.flashT / this.flashDur) * Number(this.flashEl.dataset.a ?? 0);
-    this.flashEl.style.opacity = String(fa);
-    this.vignetteAmt = Math.max(0, this.vignetteAmt - realDt * 1.8);
+    if (this.flashT > 0) this.flashT = Math.max(0, this.flashT - realDt);
+    const fa = this.flashT > 0 ? Math.max(0, this.flashT / this.flashDur) * Number(this.flashEl.dataset.a ?? 0) : 0;
+    const faStr = fa === 0 ? '0' : fa.toFixed(3);
+    if (faStr !== this.lastFlashOp) {
+      this.lastFlashOp = faStr;
+      this.flashEl.style.opacity = faStr;
+    }
+    if (this.vignetteAmt > 0) this.vignetteAmt = Math.max(0, this.vignetteAmt - realDt * 1.8);
     const lowHp = hp > 0 && hp <= 20 && T.screenFx ? 0.25 + Math.sin(performance.now() / 180) * 0.1 : 0;
-    this.vignetteEl.style.opacity = String(Math.max(this.vignetteAmt, lowHp));
-    this.tintT -= realDt;
-    this.tintEl.style.opacity = this.tintT > 0 ? String(Math.min(1, this.tintT * 2)) : '0';
+    const vig = Math.max(this.vignetteAmt, lowHp);
+    const vigStr = vig === 0 ? '0' : vig.toFixed(3);
+    if (vigStr !== this.lastVigOp) {
+      this.lastVigOp = vigStr;
+      this.vignetteEl.style.opacity = vigStr;
+    }
+    if (this.tintT > 0) this.tintT = Math.max(0, this.tintT - realDt);
+    const tintStr = this.tintT > 0 ? Math.min(1, this.tintT * 2).toFixed(3) : '0';
+    if (tintStr !== this.lastTintOp) {
+      this.lastTintOp = tintStr;
+      this.tintEl.style.opacity = tintStr;
+    }
   }
 }

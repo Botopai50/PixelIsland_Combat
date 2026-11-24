@@ -1,0 +1,1 @@
+import{t as e}from"./rolldown-runtime-DK3Fl9T5.js";var t=/* @__PURE__ */ e({AnimalMotionAnimation:()=>n}),n=class{stoppedFor=0;useRestPose(e,t,n,r,i){return!e||!n||!r||t>=.28?(this.stoppedFor=0,!1):(this.stoppedFor+=Math.max(0,i),this.stoppedFor>=.1)}};export{t as n,n as t};

@@ -185,6 +185,10 @@ export class HumanoidRig {
     this.root.scale.setScalar(s.scale);
   }
 
+  /** Intensidade atual do flash de dano (0 ou 1) e cor, para sincronizar billboards. */
+  get flashAmount(): number { return this.flashT > 0 ? 1 : 0; }
+  get flashTint(): THREE.Color { return this.flashColor; }
+
   /** Pisca o corpo (feedback de dano). */
   flash(color: number, duration = 0.12) {
     this.flashT = duration;

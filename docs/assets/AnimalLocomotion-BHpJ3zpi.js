@@ -1,0 +1,1 @@
+import{t as e}from"./rolldown-runtime-DK3Fl9T5.js";var t=/* @__PURE__ */ e({steerAnimalLocomotion:()=>n});function n(e,t,n){let r=Math.cos(t-n),i=Math.max(0,Math.min(1,(r-.35)/.5)),a=Math.hypot(e.x,e.z)*i;e.x=Math.sin(n)*a,e.z=Math.cos(n)*a}export{n,t};

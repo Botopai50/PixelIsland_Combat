@@ -1,0 +1,32 @@
+import { animalTurnProfile, type AnimalTurnPose } from './AnimalTurnPose';
+import type { SpriteRecipe, SpriteView } from './AnimalSpriteCache';
+
+// Apenas módulos locais conhecidos; o worker executa o mesmo gerador de pixels do jogo.
+const modules = import.meta.glob(['./*.ts', '!./AnimalSprite*.ts']);
+type Texture = { image: { data: Uint8Array; width: number; height: number } };
+type Pack = {
+  getView(tier: number, direction: number): Texture;
+  getSunView(direction: number, pitch: number): Texture;
+  renderView?(tier: number, direction: number, width: number, height: number, turn?: AnimalTurnPose, profile?: ReturnType<typeof animalTurnProfile>): Texture;
+};
+let jobs = Promise.resolve();
+self.onmessage = event => {
+  const { id, recipe, view } = event.data as { id: number; recipe: SpriteRecipe; view: SpriteView };
+  // Serializa mensagens mesmo durante o carregamento do módulo da espécie.
+  jobs = jobs.then(async () => {
+    try {
+      const load = modules[recipe.module];
+      if (!load) throw new Error('Unknown animal module');
+      const mod = await load() as Record<string, (...args: unknown[]) => Pack>;
+      const pack = mod[recipe.factory](...recipe.args);
+      const resolution = recipe.resolution;
+      const tex = resolution && pack.renderView
+        ? pack.renderView(view.tier, view.direction, resolution.width, resolution.height, recipe.turn, animalTurnProfile(recipe.factory))
+        : view.sunPitch === undefined ? pack.getView(view.tier, view.direction) : pack.getSunView(view.direction, view.sunPitch);
+      const { width, height } = tex.image;
+      // Copiar preserva o cache do worker; transferir evita cópia na thread de renderização.
+      const data = resolution && pack.renderView ? tex.image.data : new Uint8Array(tex.image.data).slice();
+      self.postMessage({ id, pixels: { data, width, height } }, { transfer: [data.buffer] });
+    } catch (error) { self.postMessage({ id, error: String(error) }); }
+  });
+};

@@ -6,7 +6,7 @@
 export type Action =
   | 'attack' | 'guard' | 'jump' | 'dodge' | 'sprint' | 'lock'
   | 'view' | 'shoulder' | 'inventory' | 'tweak' | 'spawn' | 'reset' | 'help'
-  | 'runToggle' | 'nextItem' | 'prevItem' | 'juice' | 'sneak' | 'rigView'
+  | 'runToggle' | 'nextItem' | 'prevItem' | 'juice' | 'sneak' | 'rigView' | 'spriteMap' | 'interact'
   | 'slot1' | 'slot2' | 'slot3' | 'slot4' | 'slot5' | 'slot6';
 
 export class Input {
@@ -20,6 +20,29 @@ export class Input {
   touchMode = false;
   /** Bloqueia input de jogo (menus abertos). */
   blocked = false;
+  onPointerLockError?: () => void;
+  freeMouse = false;
+  private mouseDrag: { x: number; y: number; distance: number } | null = null;
+
+  private enableFreeMouse() {
+    if (this.freeMouse) return;
+    this.freeMouse = true;
+    this.onPointerLockError?.();
+  }
+
+  captureMouse(canvas: HTMLCanvasElement) {
+    if (this.blocked || this.freeMouse || document.pointerLockElement === canvas) return;
+    if (!canvas.requestPointerLock) {
+      this.enableFreeMouse();
+      return;
+    }
+    try {
+      // pointerlockerror informa a UI; a rejeição também precisa ser tratada.
+      canvas.requestPointerLock()?.catch(() => this.enableFreeMouse());
+    } catch {
+      this.enableFreeMouse();
+    }
+  }
 
   private held = new Set<Action>();
   private pressed = new Set<Action>();
@@ -100,8 +123,13 @@ export class Input {
   }
 
   releaseAll() {
+    this.mouseDrag = null;
     for (const a of [...this.held]) this.setButton(a, false);
+    this.pressed.clear();
     this.keyMove = { f: 0, b: 0, l: 0, r: 0 };
+    this.touchMoveX = this.touchMoveY = 0;
+    this.moveX = this.moveY = 0;
+    this.lookX = this.lookY = 0;
   }
 
   // ---------------------------------------------------------------- teclado/mouse
@@ -110,12 +138,14 @@ export class Input {
       Space: 'jump', ShiftLeft: 'sprint', ShiftRight: 'sprint',
       ControlLeft: 'sneak', ControlRight: 'sneak', KeyC: 'dodge',
       KeyQ: 'lock', KeyV: 'view', KeyT: 'shoulder', Tab: 'inventory', KeyI: 'inventory',
-      KeyP: 'tweak', KeyB: 'juice', KeyG: 'spawn', KeyR: 'reset', KeyH: 'help', KeyZ: 'runToggle', KeyX: 'rigView', CapsLock: 'runToggle',
+      KeyP: 'tweak', KeyB: 'juice', KeyG: 'spawn', KeyR: 'reset', KeyH: 'help', KeyZ: 'runToggle', KeyX: 'rigView', KeyM: 'spriteMap', KeyE: 'interact', CapsLock: 'runToggle',
       KeyJ: 'attack', KeyK: 'guard', KeyL: 'dodge',
       Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', Digit6: 'slot6',
     };
     const onKey = (e: KeyboardEvent, down: boolean) => {
-      if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+      const target = e.target;
+      if (down && target instanceof HTMLElement &&
+          (target.closest('input, textarea, select') || target.isContentEditable)) return;
       const c = e.code;
       if (c === 'KeyW' || c === 'ArrowUp') this.keyMove.f = down ? 1 : 0;
       else if (c === 'KeyS' || c === 'ArrowDown') this.keyMove.b = down ? 1 : 0;
@@ -138,12 +168,21 @@ export class Input {
     window.addEventListener('keydown', (e) => onKey(e, true));
     window.addEventListener('keyup', (e) => onKey(e, false));
     window.addEventListener('blur', () => this.releaseAll());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.releaseAll();
+    });
 
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('mousedown', (e) => {
-      if (this.touchMode) return;
+      if (this.touchMode || this.blocked) return;
       if (document.pointerLockElement !== canvas) {
-        if (!this.blocked) canvas.requestPointerLock?.();
+        this.captureMouse(canvas);
+        if (this.freeMouse) {
+          if (e.button === 0) this.mouseDrag = { x: e.clientX, y: e.clientY, distance: 0 };
+          if (e.button === 2) this.setButton('guard', true);
+          if (e.button === 1) this.tap('lock');
+          e.preventDefault();
+        }
         return;
       }
       if (e.button === 0) this.setButton('attack', true);
@@ -154,21 +193,39 @@ export class Input {
       }
     });
     window.addEventListener('mouseup', (e) => {
+      if (e.button === 0 && this.mouseDrag) {
+        const drag = this.mouseDrag;
+        this.mouseDrag = null;
+        if (drag.distance < 5 && e.target === canvas && !this.blocked) this.tap('attack');
+      }
       if (e.button === 0) this.setButton('attack', false);
       if (e.button === 2) this.setButton('guard', false);
       if (e.button === 1) this.setButton('lock', false);
     });
     let lockedAt = 0;
+    document.addEventListener('pointerlockerror', () => this.enableFreeMouse());
     window.addEventListener('mousemove', (e) => {
-      if (document.pointerLockElement !== canvas) return;
+      if (document.pointerLockElement !== canvas) {
+        if (this.freeMouse && this.mouseDrag) {
+          if (!(e.buttons & 1)) { this.mouseDrag = null; return; }
+          const dx = e.clientX - this.mouseDrag.x;
+          const dy = e.clientY - this.mouseDrag.y;
+          this.mouseDrag.x = e.clientX;
+          this.mouseDrag.y = e.clientY;
+          this.mouseDrag.distance += Math.hypot(dx, dy);
+          if (this.mouseDrag.distance >= 5) this.addLook(dx, dy);
+        }
+        return;
+      }
       // alguns navegadores geram saltos enormes logo após travar o ponteiro
       if (performance.now() - lockedAt < 120 || Math.abs(e.movementX) > 350 || Math.abs(e.movementY) > 350) return;
       this.addLook(e.movementX, e.movementY);
     });
     canvas.addEventListener('wheel', (e) => {
-      if (document.pointerLockElement !== canvas) return;
+      if (this.blocked || (document.pointerLockElement !== canvas && !this.freeMouse)) return;
+      e.preventDefault();
       this.tap(e.deltaY > 0 ? 'nextItem' : 'prevItem');
-    }, { passive: true });
+    }, { passive: false });
     document.addEventListener('pointerlockchange', () => {
       if (document.pointerLockElement === canvas) lockedAt = performance.now();
       if (document.pointerLockElement !== canvas) {
