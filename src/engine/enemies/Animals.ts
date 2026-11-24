@@ -1,4 +1,5 @@
 import { registerAnimalSpritePack, getResolvedAnimalView, ensureAnimalSpriteView, isAnimalLocomotionPack, animalRestPack } from './AnimalSpriteCache';
+import { addToPixelActorLayer } from '../core/PixelActorLayer';
 import { AnimalMotionAnimation } from './AnimalMotionAnimation';
 import { AnimalViewAngles } from './AnimalViewAngles';
 import { AnimalTurnMotion } from './AnimalTurnMotion';
@@ -1345,8 +1346,6 @@ export abstract class BasePixelAnimal implements AnimalEntity {
   protected readonly uFlashColor = { value: new THREE.Color(0xff3030) };
   protected readonly uFlashAmount = { value: 0 };
   protected readonly mapUniform: { value: THREE.CanvasTexture };
-  protected readonly pixelSizeUniform = { value: 3.0 };
-  protected readonly gridOriginUniform = { value: new THREE.Vector2(0, 0) };
   protected readonly materialShader: THREE.ShaderMaterial;
   protected readonly depthMaterial: THREE.MeshDepthMaterial;
   protected readonly mesh: THREE.Mesh;
@@ -1370,7 +1369,6 @@ export abstract class BasePixelAnimal implements AnimalEntity {
 
   protected readonly camPos = new THREE.Vector3();
   protected readonly camBack = new THREE.Vector3();
-  protected readonly camFwd = new THREE.Vector3();
   protected readonly camUp = new THREE.Vector3();
   protected readonly toCam = new THREE.Vector3();
   protected readonly xAxis = new THREE.Vector3();
@@ -1380,7 +1378,6 @@ export abstract class BasePixelAnimal implements AnimalEntity {
   protected readonly left = new THREE.Vector3();
   protected readonly up = new THREE.Vector3();
   protected readonly tmp = new THREE.Vector3();
-  protected readonly ndc = new THREE.Vector3();
   protected readonly basisMat = new THREE.Matrix4();
 
   abstract readonly position: THREE.Vector3;
@@ -1411,8 +1408,8 @@ export abstract class BasePixelAnimal implements AnimalEntity {
           1 / Math.min(96, Math.max(8, Math.round(pw * ANIMAL_DENSITY_SCALE))),
           1 / Math.min(96, Math.max(8, Math.round(ph * ANIMAL_DENSITY_SCALE))),
         ) },
-        uPixelSize: this.pixelSizeUniform,
-        uGridOrigin: this.gridOriginUniform,
+        uPixelSize: { value: 1 },
+        uGridOrigin: { value: new THREE.Vector2() },
         uFlashColor: this.uFlashColor,
         uFlashAmount: this.uFlashAmount,
       },
@@ -1435,6 +1432,7 @@ export abstract class BasePixelAnimal implements AnimalEntity {
     this.mesh.receiveShadow = false;
     this.mesh.customDepthMaterial = this.depthMaterial;
     this.mesh.frustumCulled = false;
+    addToPixelActorLayer(this.mesh);
     this.root.add(this.mesh);
 
     const sunSh = createSunShadowBillboard(this.geometry, initialTex, name);
@@ -1492,7 +1490,7 @@ export abstract class BasePixelAnimal implements AnimalEntity {
     pack: CreatureViewPack,
     centerY: number,
     camera: THREE.Camera,
-    drawingBufferSize?: THREE.Vector2,
+    _drawingBufferSize?: THREE.Vector2,
   ) {
     if (this.ctx.tuning.freezeBillboards) return;
     const motor = this.groundMotor;
@@ -1504,16 +1502,9 @@ export abstract class BasePixelAnimal implements AnimalEntity {
     camera.getWorldPosition(this.camPos);
     this.camUp.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
     this.camBack.setFromMatrixColumn(camera.matrixWorld, 2).normalize();
-    this.camFwd.copy(this.camBack).negate();
     const cameraChanged = this.viewAngles.observeCamera(
       this.camPos.x, this.camPos.y, this.camPos.z, this.camBack.x, this.camBack.y, this.camBack.z,
     );
-
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    const bufW = drawingBufferSize ? drawingBufferSize.x : (typeof window !== 'undefined' ? window.innerWidth * dpr : 1280);
-    const bufH = drawingBufferSize ? drawingBufferSize.y : (typeof window !== 'undefined' ? window.innerHeight * dpr : 720);
-    const fovDeg = (camera as THREE.PerspectiveCamera).fov || 70;
-    const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(fovDeg) * 0.5);
 
     this.uFlashAmount.value = this.flash;
 
@@ -1608,19 +1599,6 @@ export abstract class BasePixelAnimal implements AnimalEntity {
     this.contactShadow.scale.set(this.baseContactRx * 2 * airFade, 1, this.baseContactRz * 2 * airFade);
     (this.contactShadow.material as THREE.MeshBasicMaterial).opacity = airFade;
 
-    const partDepth = Math.max(0.5, this.tmp.subVectors(this.mesh.position, this.camPos).dot(this.camFwd));
-    // Usa a mesma densidade de pixel do herói (HERO_PPU = 56) para que todos os animais
-    // tenham exatamente o mesmo tamanho de pixel na tela que o humano (sem mixels).
-    const ppu = 56;
-    const p = Math.max(1, Math.round(bufH / (2 * partDepth * tanHalfFov * ppu)));
-    this.pixelSizeUniform.value = p;
-    this.ndc.copy(this.mesh.position).project(camera);
-    const sxScreen = (this.ndc.x * 0.5 + 0.5) * bufW;
-    const syScreen = (this.ndc.y * 0.5 + 0.5) * bufH;
-    this.gridOriginUniform.value.set(
-      sxScreen - ((this.pw & 1) ? 0.5 * p : 0),
-      syScreen - ((this.ph & 1) ? 0.5 * p : 0),
-    );
   }
 
   abstract center(out: THREE.Vector3): THREE.Vector3;

@@ -6,6 +6,7 @@ import { steerAnimalLocomotion } from './AnimalLocomotion';
 import { keepAnimalAboveGround } from './AnimalGrounding';
 import { sampleAnimalCycle } from './AnimalAnimation';
 import * as THREE from 'three';
+import { addToPixelActorLayer } from '../core/PixelActorLayer';
 import type { GameContext } from '../core/Context';
 import type { Damageable, HitInfo, HitResult, Hurtbox, Team } from '../combat/types';
 import { emptyResult, newId } from '../combat/types';
@@ -13,6 +14,8 @@ import type { EnemyTarget } from './Enemy';
 import {
   CREATURE_PITCHES,
   CREATURE_YAWS,
+  CREATURE_FRAGMENT_SHADER,
+  CREATURE_VERTEX_SHADER,
   createContactShadow,
   createSunShadowBillboard,
   getSunDir,
@@ -38,47 +41,6 @@ const angleDiff = (a: number, b: number) => Math.atan2(Math.sin(b - a), Math.cos
  *   `dash0..dash5` (galope completo 6f), `jump0`/`jump1` (subida e descida), `hurt` (recuo).
  * - Mesmo shader de pixel snap inteiro e projeção de sombra do herói.
  */
-
-const VERTEX_SHADER = /* glsl */ `
-uniform vec2 uTexelSize;
-varying vec2 vUv;
-
-void main() {
-  vec2 pad = vec2(1.0) + 2.0 * uTexelSize;
-  vec3 pos = vec3(position.xy * pad, position.z);
-  vUv = (uv - 0.5) * pad + 0.5;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-}
-`;
-
-const FRAGMENT_SHADER = /* glsl */ `
-uniform sampler2D uMap;
-uniform float uPixelSize;
-uniform vec2 uGridOrigin;
-uniform vec3 uFlashColor;
-uniform float uFlashAmount;
-varying vec2 vUv;
-
-void main() {
-  vec2 cellCenter = floor((gl_FragCoord.xy - uGridOrigin) / uPixelSize) * uPixelSize + uGridOrigin + 0.5 * uPixelSize;
-  vec2 delta = cellCenter - gl_FragCoord.xy;
-  vec2 snappedUv = vUv + dFdx(vUv) * delta.x + dFdy(vUv) * delta.y;
-
-  if (snappedUv.x < 0.0 || snappedUv.x > 1.0 || snappedUv.y < 0.0 || snappedUv.y > 1.0) discard;
-
-  vec4 texel = texture2D(uMap, snappedUv);
-  if (texel.a < 0.5) discard;
-
-  vec3 col = texel.rgb;
-  if (uFlashAmount > 0.001) {
-    col = mix(col, uFlashColor * 1.4, uFlashAmount * 0.72);
-  }
-
-  gl_FragColor = vec4(col, 1.0);
-  #include <tonemapping_fragment>
-  #include <colorspace_fragment>
-}
-`;
 
 const BOAR_PAL: Record<string, [number, number, number]> = {
   k: [0x1c, 0x14, 0x18], // contorno / olhos / narinas / cascos
@@ -591,10 +553,6 @@ interface BoarSlot {
   material: THREE.ShaderMaterial;
   depthMaterial: THREE.MeshDepthMaterial;
   mapUniform: { value: THREE.CanvasTexture };
-  pixelSizeUniform: { value: number };
-  gridOriginUniform: { value: THREE.Vector2 };
-  pw: number;
-  ph: number;
 }
 
 type BoarState = 'idle' | 'wander' | 'windup' | 'dash' | 'recover' | 'hurt' | 'dead';
@@ -647,7 +605,6 @@ export class Boar implements Damageable {
 
   private readonly camPos = new THREE.Vector3();
   private readonly camBack = new THREE.Vector3();
-  private readonly camFwd = new THREE.Vector3();
   private readonly camUp = new THREE.Vector3();
   private readonly toCam = new THREE.Vector3();
   private readonly xAxis = new THREE.Vector3();
@@ -657,7 +614,6 @@ export class Boar implements Damageable {
   private readonly left = new THREE.Vector3();
   private readonly up = new THREE.Vector3();
   private readonly tmp = new THREE.Vector3();
-  private readonly ndc = new THREE.Vector3();
   private readonly basisMat = new THREE.Matrix4();
 
   constructor(private readonly ctx: GameContext, startPos: THREE.Vector3) {
@@ -702,19 +658,17 @@ export class Boar implements Damageable {
 
   private createSlot(tex: THREE.CanvasTexture, pw: number, ph: number, name: string): BoarSlot {
     const mapUniform = { value: tex };
-    const pixelSizeUniform = { value: 3.0 };
-    const gridOriginUniform = { value: new THREE.Vector2(0, 0) };
     const material = new THREE.ShaderMaterial({
       uniforms: {
         uMap: mapUniform,
         uTexelSize: { value: new THREE.Vector2(1 / pw, 1 / ph) },
-        uPixelSize: pixelSizeUniform,
-        uGridOrigin: gridOriginUniform,
+        uPixelSize: { value: 1 },
+        uGridOrigin: { value: new THREE.Vector2() },
         uFlashColor: this.uFlashColor,
         uFlashAmount: this.uFlashAmount,
       },
-      vertexShader: VERTEX_SHADER,
-      fragmentShader: FRAGMENT_SHADER,
+      vertexShader: CREATURE_VERTEX_SHADER,
+      fragmentShader: CREATURE_FRAGMENT_SHADER,
       side: THREE.DoubleSide,
       transparent: false,
       depthWrite: true,
@@ -732,8 +686,9 @@ export class Boar implements Damageable {
     mesh.receiveShadow = false;
     mesh.customDepthMaterial = depthMaterial;
     mesh.frustumCulled = false;
+    addToPixelActorLayer(mesh);
     this.root.add(mesh);
-    return { mesh, material, depthMaterial, mapUniform, pixelSizeUniform, gridOriginUniform, pw, ph };
+    return { mesh, material, depthMaterial, mapUniform };
   }
 
   private hasTex = false;
@@ -790,7 +745,7 @@ export class Boar implements Damageable {
     return res;
   }
 
-  update(dt: number, target: EnemyTarget | null, camera: THREE.Camera, drawingBufferSize?: THREE.Vector2) {
+  update(dt: number, target: EnemyTarget | null, camera: THREE.Camera, _drawingBufferSize?: THREE.Vector2) {
     if (dt > 0) {
       this.stateT += dt;
       this.idleClock += dt;
@@ -803,7 +758,7 @@ export class Boar implements Damageable {
         this.vel.y -= 20 * dt;
         this.motor.update(dt);
         this.syncHurtbox();
-        this.updateVisuals(camera, drawingBufferSize);
+        this.updateVisuals(camera);
         return;
       }
 
@@ -933,7 +888,7 @@ export class Boar implements Damageable {
       this.syncHurtbox();
     }
 
-    this.updateVisuals(camera, drawingBufferSize);
+    this.updateVisuals(camera);
   }
 
   private pickPose(horizSpeed: number): BoarPoseName {
@@ -962,21 +917,14 @@ export class Boar implements Damageable {
     return this.bodyTurn;
   }
 
-  private updateVisuals(camera: THREE.Camera, drawingBufferSize?: THREE.Vector2) {
+  private updateVisuals(camera: THREE.Camera) {
     if (this.ctx.tuning.freezeBillboards) return;
     camera.getWorldPosition(this.camPos);
     this.camUp.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
     this.camBack.setFromMatrixColumn(camera.matrixWorld, 2).normalize();
-    this.camFwd.copy(this.camBack).negate();
     const cameraChanged = this.viewAngles.observeCamera(
       this.camPos.x, this.camPos.y, this.camPos.z, this.camBack.x, this.camBack.y, this.camBack.z,
     );
-
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    const bufW = drawingBufferSize ? drawingBufferSize.x : (typeof window !== 'undefined' ? window.innerWidth * dpr : 1280);
-    const bufH = drawingBufferSize ? drawingBufferSize.y : (typeof window !== 'undefined' ? window.innerHeight * dpr : 720);
-    const fovDeg = (camera as THREE.PerspectiveCamera).fov || 70;
-    const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(fovDeg) * 0.5);
 
     this.uFlashAmount.value = this.flash;
 
@@ -1061,16 +1009,6 @@ export class Boar implements Damageable {
     this.contactShadow.scale.set(0.84 * airFade, 1, 1.12 * airFade);
     (this.contactShadow.material as THREE.MeshBasicMaterial).opacity = airFade;
 
-    const partDepth = Math.max(0.5, this.tmp.subVectors(this.bodySlot.mesh.position, this.camPos).dot(this.camFwd));
-    const p = Math.max(1.5, bufH / (2 * partDepth * tanHalfFov * BOAR_PPU));
-    this.bodySlot.pixelSizeUniform.value = p;
-    this.ndc.copy(this.bodySlot.mesh.position).project(camera);
-    const sxScreen = (this.ndc.x * 0.5 + 0.5) * bufW;
-    const syScreen = (this.ndc.y * 0.5 + 0.5) * bufH;
-    this.bodySlot.gridOriginUniform.value.set(
-      sxScreen - ((this.bodySlot.pw & 1) ? 0.5 * p : 0),
-      syScreen - ((this.bodySlot.ph & 1) ? 0.5 * p : 0),
-    );
   }
 
   dispose() {

@@ -170,7 +170,7 @@ export class SkeletalBillboard {
   private readonly boneScale = new THREE.Vector3();
   private readonly basisMat = new THREE.Matrix4();
 
-  constructor(private readonly rig: HumanoidRig) {
+  constructor(private readonly rig: HumanoidRig, private readonly viewportCell?: number) {
     this.root.name = 'HeroSkeletalBillboard';
     this.sprites = createHeroSpriteSet();
 
@@ -355,7 +355,7 @@ export class SkeletalBillboard {
     const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
     const bufferWidth = Math.max(1, drawingBufferSize?.x ?? (typeof window === 'undefined' ? 1280 : window.innerWidth * dpr));
     const bufferHeight = Math.max(1, drawingBufferSize?.y ?? (typeof window === 'undefined' ? 720 : window.innerHeight * dpr));
-    const pixelSize = bufferHeight >= 680 ? 2 : 1;
+    const pixelSize = this.viewportCell ?? (bufferHeight >= 680 ? 2 : 1);
     this.pixelSizeUniform.value = pixelSize;
     this.bufferSizeUniform.value.set(bufferWidth, bufferHeight);
 

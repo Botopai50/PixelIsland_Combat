@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addToPixelActorLayer } from '../core/PixelActorLayer';
 import type { GameContext, Threat } from '../core/Context';
 import { CharacterMotor } from '../physics/CharacterMotor';
 import { HumanoidRig, GOBLIN_STYLE, ARM_UPPER, ARM_FORE } from '../character/HumanoidRig';
@@ -107,8 +108,10 @@ export class Enemy implements Damageable, Threat {
     this.motor = new CharacterMotor(ctx.physics);
     this.motor.radius = 0.4;
     this.motor.teleport(pos);
+    addToPixelActorLayer(this.rig.root);
     ctx.scene.add(this.rig.root);
     this.club = createWeaponModel('club');
+    addToPixelActorLayer(this.club.root);
     ctx.scene.add(this.club.root);
     ctx.scene.add(this.trail.mesh);
     this.hurtboxes = [
@@ -127,6 +130,7 @@ export class Enemy implements Damageable, Threat {
         }
       });
       this.shieldModel.root.scale.setScalar(1.15);
+      addToPixelActorLayer(this.shieldModel.root);
       ctx.scene.add(this.shieldModel.root);
       this.hurtboxes.push({ a: new THREE.Vector3(), b: new THREE.Vector3(), radius: 0.34, tag: 'shield', material: 'metal' });
     }

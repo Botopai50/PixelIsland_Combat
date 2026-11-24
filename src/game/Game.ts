@@ -105,6 +105,7 @@ import { TweakPanel } from '../engine/ui/TweakPanel';
 import { bladeSegmentWorld } from '../engine/combat/Attacks';
 import { TestArena } from '../arena/TestArena';
 import { createHelpOverlay, createStartOverlay } from './Overlays';
+import { PixelActorRenderer } from './PixelActorRenderer';
 import { exportModelsGLB } from './ExportModels';
 import { RigViewer } from '../engine/debug/RigViewer';
 import { rand } from '../engine/core/math';
@@ -145,7 +146,7 @@ export class Game {
   private paused = false;
   private last = performance.now();
   private isTouch: boolean;
-  private bufSize = new THREE.Vector2();
+  private readonly actorRenderer: PixelActorRenderer;
   private camRightTmp = new THREE.Vector3();
   private bladesTmp: { base: THREE.Vector3; tip: THREE.Vector3 }[] = [];
   private animalBakeCursor = 0;
@@ -201,6 +202,7 @@ export class Game {
     this.fpv = new FirstPersonView(ctx, this.player);
     this.enemies = new EnemyDirector(ctx);
     this.arena = new TestArena(ctx, this.pickups);
+    this.actorRenderer = new PixelActorRenderer(renderer, scene);
     this.player.spawn(this.arena.playerStart, 0);
     this.camRig.yaw = 0;
     const travelerStart = this.arena.playerStart.clone().add(new THREE.Vector3(1.5, 0, 2.35));
@@ -843,19 +845,21 @@ export class Game {
     ctx.shake.update(clock.realDt);
     this.camRig.update(clock.realDt, pdt);
     const cam = this.camRig.camera;
+    this.actorRenderer.prepare(cam);
+    const actorCamera = this.actorRenderer.camera;
+    const actorSize = this.actorRenderer.size;
     const first = this.camRig.blend > 0.5;
-    this.renderer.getDrawingBufferSize(this.bufSize);
     this.view.visible = !first && this.camRig.headDistance > 0.6;
-    this.view.update(pdt, cam, this.bufSize);
+    this.view.update(pdt, actorCamera, actorSize);
     const t1 = performance.now();
-    for (const monster of this.monsters) monster.update(dt, this.player.alive ? this.player : null, cam, this.bufSize);
+    for (const monster of this.monsters) monster.update(dt, this.player.alive ? this.player : null, cam);
     const active = this.started && !this.paused && this.player.alive;
-    this.traveler.update(dt, this.player, cam, this.bufSize, active, this.isTouch);
+    this.traveler.update(dt, this.player, cam, undefined, active, this.isTouch);
     this.updateBossHud(active);
     const animalTarget = ctx.tuning.peacefulAnimals ? null : this.player;
     for (let i = this.boars.length - 1; i >= 0; i--) {
       const b = this.boars[i];
-      b.update(dt, animalTarget, cam, this.bufSize);
+      b.update(dt, animalTarget, cam);
       if (!b.alive && b.deadT > 1.1 && !b.removed) {
         b.removed = true;
         this.ctx.events.emit('enemyDeath', { pos: b.position.clone().setY(b.position.y + 0.5) });
@@ -869,7 +873,7 @@ export class Game {
       const start = this.animalBakeCursor++ % nAnim;
       for (let k = 0; k < nAnim; k++) {
         const a = this.animals[(start + k) % nAnim];
-        a.update(dt, animalTarget, cam, this.bufSize);
+        a.update(dt, animalTarget, cam);
       }
       for (let i = nAnim - 1; i >= 0; i--) {
         const a = this.animals[i];
@@ -884,7 +888,7 @@ export class Game {
     }
     const t2 = performance.now();
     this.rigViewer.update();
-    if (this.rigViewer.mode === 'rest') this.view.updateBillboards(cam, this.bufSize);
+    if (this.rigViewer.mode === 'rest') this.view.updateBillboards(actorCamera, actorSize);
     this.fpv.visible = first;
     this.fpv.update(pdt, cam);
     this.camRightTmp.setFromMatrixColumn(cam.matrixWorld, 0);
@@ -908,14 +912,7 @@ export class Game {
     // render: mundo + viewmodel (profundidade limpa → armas não atravessam paredes)
     const t3 = performance.now();
     const r = this.renderer;
-    r.autoClear = true;
-    r.render(ctx.scene, cam);
-    if (first) {
-      r.autoClear = false;
-      r.clearDepth();
-      r.render(this.fpv.scene, cam);
-      r.autoClear = true;
-    }
+    this.actorRenderer.render(ctx.scene, cam, first ? this.fpv.scene : undefined);
     const t4 = performance.now();
     const pa = this.perfAcc;
     pa.frames++;

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addToPixelActorLayer } from '../core/PixelActorLayer';
 import type { GameContext } from '../core/Context';
 import { HumanoidRig, HERO_STYLE, ARM_UPPER, ARM_FORE } from './HumanoidRig';
 import { HumanoidAnimator } from './HumanoidAnimator';
@@ -69,13 +70,15 @@ export class PlayerView {
       ctx.events.emit('footstep', { pos: p.clone(), surface: player.motor.surface, intensity: intensity * (1 - 0.75 * player.sneakAmount), player: true });
     };
     ctx.scene.add(this.rig.root);
-    this.billboard = new SkeletalBillboard(this.rig);
+    this.billboard = new SkeletalBillboard(this.rig, 1);
+    addToPixelActorLayer(this.billboard.root);
     ctx.scene.add(this.billboard.root);
     this.gearBillboards = new EquipmentBillboards(
       this.billboard.pixelSizeUniform,
       this.billboard.bufferSizeUniform,
       this.billboard.pixelOffsetUniform,
     );
+    addToPixelActorLayer(this.gearBillboards.root);
     ctx.scene.add(this.gearBillboards.root);
     ctx.scene.add(this.trail.mesh);
     const shadowOnlyMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
