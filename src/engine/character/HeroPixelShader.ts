@@ -30,7 +30,6 @@ void main() {
 
 export const HERO_PIXEL_SAMPLING = /* glsl */ `
 uniform sampler2D uMap;
-uniform vec2 uTexelSize;
 uniform float uPixelSize;
 flat varying vec2 vScreenCenter;
 flat varying vec4 vScreenAxes;
@@ -48,23 +47,8 @@ vec3 sampleHeroPixel() {
 
   if (snappedUv.x < 0.0 || snappedUv.x > 1.0 || snappedUv.y < 0.0 || snappedUv.y > 1.0) discard;
 
-  // Resolve source texel boundaries inside each cell. Sampling just one
-  // nearest texel lets a tiny limb rotation flip an entire cell's color.
-  // Every fragment of the cell still uses the same UV and opaque output.
-  vec2 texelPos = snappedUv / uTexelSize - 0.5;
-  vec2 base = (floor(texelPos) + 0.5) * uTexelSize;
-  vec2 weight = smoothstep(vec2(0.22), vec2(0.78), fract(texelPos));
-  vec4 a = texture2D(uMap, base);
-  vec4 b = texture2D(uMap, base + vec2(uTexelSize.x, 0.0));
-  vec4 c = texture2D(uMap, base + vec2(0.0, uTexelSize.y));
-  vec4 d = texture2D(uMap, base + uTexelSize);
-  a.rgb *= a.a;
-  b.rgb *= b.a;
-  c.rgb *= c.a;
-  d.rgb *= d.a;
-  vec4 texel = mix(mix(a, b, weight.x), mix(c, d, weight.x), weight.y);
+  vec4 texel = texture2D(uMap, snappedUv);
   if (texel.a < 0.5) discard;
-
-  return texel.rgb / texel.a;
+  return texel.rgb;
 }
 `;
